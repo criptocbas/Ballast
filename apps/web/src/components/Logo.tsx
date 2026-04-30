@@ -3,8 +3,11 @@ interface LogoProps {
 }
 
 /**
- * Reflux mark — a recursive-flow glyph hinting at "yield flows back to insurance".
- * The two intersecting arcs form a soft R that reads as a return / refund / reflow motion.
+ * Ballast mark — a plumb bob.
+ *
+ * A vertical line dropping to a filled circle: the simplest tool for finding
+ * stable vertical, where gravity does the work. The most direct possible glyph
+ * for what Ballast does.
  */
 export function Logo({ className }: LogoProps) {
   return (
@@ -12,16 +15,15 @@ export function Logo({ className }: LogoProps) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
     >
-      <path d="M12 3a9 9 0 1 1-9 9" />
-      <path d="M12 7v5l3 2" />
-      <path d="M3 12l2.5-2.5" />
-      <path d="M3 12l2.5 2.5" />
+      <line x1="6" y1="3" x2="18" y2="3" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+      <circle cx="12" cy="18" r="3" fill="currentColor" stroke="none" />
     </svg>
   );
 }

@@ -11,9 +11,9 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--bg)]/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
-        <Link href="/" className="flex items-center gap-2.5 text-fg" aria-label="Reflux home">
-          <Logo className="h-5 w-5 text-accent" />
-          <span className="text-[15px] font-semibold tracking-tight">Reflux</span>
+        <Link href="/" className="flex items-center gap-2.5 text-fg" aria-label="Ballast home">
+          <Logo className="h-5 w-5 text-[var(--accent)]" />
+          <span className="text-[15px] font-semibold tracking-tight">Ballast</span>
           <span className="hidden sm:inline-block text-[11px] uppercase tracking-[0.18em] font-medium text-[var(--fg-muted)] border border-[var(--border)] rounded px-1.5 py-0.5 ml-2">
             alpha
           </span>

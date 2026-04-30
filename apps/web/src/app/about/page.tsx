@@ -3,13 +3,13 @@ import { ExternalLink } from '@/components/ExternalLink';
 
 export const metadata: Metadata = {
   title: 'About',
-  description: 'How Reflux works and why we built it.',
+  description: 'How Ballast works and why we built it.',
 };
 
 export default function AboutPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">About Reflux</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">About Ballast</h1>
 
       <Section title="The thesis">
         <p>
@@ -18,14 +18,14 @@ export default function AboutPage() {
           expensive, illiquid, or operationally ugly.
         </p>
         <p>
-          Reflux is a small experiment: what if you used Jupiter&apos;s prediction-market product
+          Ballast is a small experiment: what if you used Jupiter&apos;s prediction-market product
           (built for retail speculation) as the underwriting engine of a yield product (built for
           retail savings)? The two were designed for different audiences. The composition exists
           only because the public APIs allow it.
         </p>
       </Section>
 
-      <Section title="What Reflux does">
+      <Section title="What Ballast does">
         <p>
           Depositors send USDC to a vault wallet. The vault deposits the USDC into Jupiter Lend
           Earn (currently jlUSDC at ~4.36% APY). On every rebalance tick, the vault withdraws the
@@ -44,7 +44,7 @@ export default function AboutPage() {
 
       <Section title="Why we built it">
         <p>
-          Reflux is our submission for the{' '}
+          Ballast is our submission for the{' '}
           <ExternalLink href="https://superteam.fun/earn/hackathon/frontier" className="inline">
             Solana Frontier Hackathon
           </ExternalLink>{' '}
@@ -75,7 +75,7 @@ export default function AboutPage() {
       <Section title="What this is not">
         <ul className="list-disc space-y-2 pl-6">
           <li>
-            <strong className="text-fg">Not insurance.</strong> Reflux offsets some downside while
+            <strong className="text-fg">Not insurance.</strong> Ballast offsets some downside while
             principal earns yield. It is not a regulated insurance product and the hedges may be
             insufficient for a given event.
           </li>

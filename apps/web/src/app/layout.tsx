@@ -16,13 +16,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Reflux — Yield with a built-in tail-risk hedge',
-    template: '%s · Reflux',
+    default: 'Ballast — Yield with a built-in tail-risk hedge',
+    template: '%s · Ballast',
   },
   description:
     'A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets. Built for the Solana Frontier Hackathon.',
-  applicationName: 'Reflux',
-  authors: [{ name: 'Reflux' }],
+  applicationName: 'Ballast',
+  authors: [{ name: 'Ballast' }],
 };
 
 export const viewport: Viewport = {

@@ -11,7 +11,7 @@ export default function HomePage() {
             Yield with a built-in tail-risk hedge.
           </h1>
           <p className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-[var(--fg-dim)]">
-            Reflux deposits your USDC into Jupiter Lend Earn, then routes the yield it generates
+            Ballast deposits your USDC into Jupiter Lend Earn, then routes the yield it generates
             into NO-contract hedges on tail-risk prediction markets. In normal times you keep the
             residual yield; if a hedged event hits, the payout sweeps back to depositors.
           </p>
@@ -63,7 +63,7 @@ export default function HomePage() {
               The flip that makes this work
             </h2>
             <p className="mt-5 text-[15px] leading-relaxed text-[var(--fg-dim)]">
-              Jupiter built Prediction as a speculation product and Lend as a yield product. Reflux
+              Jupiter built Prediction as a speculation product and Lend as a yield product. Ballast
               treats them as the underwriting layer and the premium engine of an insurance vault —
               a composition the Jupiter SDKs don&apos;t directly support, but the public APIs make
               possible.

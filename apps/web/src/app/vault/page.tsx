@@ -5,7 +5,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 
 export const metadata: Metadata = {
   title: 'Vault',
-  description: 'Live state of the Reflux vault — TVL, hedges, yield budget, and payout exposure.',
+  description: 'Live state of the Ballast vault — TVL, hedges, yield budget, and payout exposure.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,7 @@ export default async function VaultPage() {
           </StatusPill>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight">Vault</h1>
           <p className="mt-2 text-[var(--fg-dim)]">
-            Real-time state of the Reflux vault and its Jupiter Lend Earn position.
+            Real-time state of the Ballast vault and its Jupiter Lend Earn position.
           </p>
         </div>
         {vault && (
@@ -110,7 +110,7 @@ export default async function VaultPage() {
         <section className="mt-14">
           <h2 className="text-xl font-semibold tracking-tight">Jupiter Lend Earn rates</h2>
           <p className="mt-2 text-sm text-[var(--fg-dim)]">
-            Live snapshot from <span className="font-mono">/lend/v1/earn/tokens</span>. Reflux v1
+            Live snapshot from <span className="font-mono">/lend/v1/earn/tokens</span>. Ballast v1
             uses jlUSDC; higher-yield assets like JUICED and USDG are candidates for v1.5.
           </p>
           <div className="mt-5 overflow-hidden rounded-xl border border-[var(--border)]">

@@ -1,18 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0a0b;
-  --bg-elev: #111114;
-  --bg-elev-2: #17171c;
-  --fg: #f4f4f5;
-  --fg-dim: #a1a1aa;
-  --fg-muted: #71717a;
+  --bg: #08090f;
+  --bg-elev: #0f1118;
+  --bg-elev-2: #161922;
+  --fg: #f0f2f5;
+  --fg-dim: #9aa3b0;
+  --fg-muted: #6a7280;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
-  --accent: #8b5cf6;
-  --accent-fg: #ede9fe;
+  --accent: #d97706;
+  --accent-bright: #f59e0b;
+  --accent-soft: rgba(217, 119, 6, 0.16);
+  --accent-fg: #fef3c7;
   --positive: #10b981;
-  --warn: #f59e0b;
+  --warn: #eab308;
   --danger: #ef4444;
 }
 
@@ -52,18 +54,19 @@ body {
 }
 
 ::selection {
-  background: rgba(139, 92, 246, 0.3);
+  background: rgba(217, 119, 6, 0.3);
   color: var(--fg);
 }
 
+/* Ballast hero glow — warm amber lighthouse-beacon spilling against deep navy. */
 .hero-glow {
   background:
     radial-gradient(
-      circle at 20% 0%,
-      rgba(139, 92, 246, 0.18),
-      transparent 45%
+      circle at 22% 0%,
+      rgba(217, 119, 6, 0.20),
+      transparent 50%
     ),
-    radial-gradient(circle at 80% 30%, rgba(16, 185, 129, 0.08), transparent 40%);
+    radial-gradient(circle at 78% 18%, rgba(14, 165, 233, 0.06), transparent 45%);
 }
 
 .tabular-nums {

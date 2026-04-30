@@ -6,7 +6,7 @@ import { StatusPill } from '@/components/StatusPill';
 export const metadata: Metadata = {
   title: 'DX log',
   description:
-    'Live feed of every Jupiter API call the Reflux orchestrator has made — judges can verify integration depth in real time.',
+    'Live feed of every Jupiter API call the Ballast orchestrator has made — judges can verify integration depth in real time.',
 };
 
 export const dynamic = 'force-dynamic';

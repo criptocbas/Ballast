@@ -6,7 +6,7 @@ import { ExternalLink } from '@/components/ExternalLink';
 
 export const metadata: Metadata = {
   title: 'Deposit',
-  description: 'Deposit USDC into the Reflux vault.',
+  description: 'Deposit USDC into the Ballast vault.',
 };
 
 export const dynamic = 'force-dynamic';

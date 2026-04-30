@@ -41,6 +41,8 @@ const ConfigSchema = z.object({
   REBALANCE_CRON: z.string().default('0 0 * * *'),
   HEDGE_BUDGET_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  /** Required for admin-only endpoints (rebalance trigger, claim, depositor list). */
+  ORCHESTRATOR_ADMIN_TOKEN: z.string().min(16).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

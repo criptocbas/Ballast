@@ -5,14 +5,21 @@ import cron from 'node-cron';
 import { desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from './db/index.js';
-import { hedges as hedgesTable } from './db/schema.js';
+import { hedges as hedgesTable, yieldWithdrawals } from './db/schema.js';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
-import { readUsdcEarnPosition, depositUsdcToLendEarn, USDC_MINT } from './lend.js';
+import {
+  readUsdcEarnPosition,
+  depositUsdcToLendEarn,
+  withdrawUsdcFromLendEarn,
+  USDC_MINT,
+} from './lend.js';
 import { getJupiterClients } from './jupiter.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
 import { openHedgeOrder, listVaultPositions } from './prediction.js';
 import { runClaimSweep } from './claimer.js';
+import { getTotalContributed } from './accountant.js';
+import { processPendingWithdrawals } from './withdrawals.js';
 
 /**
  * Ballast rebalance loop.
@@ -84,7 +91,14 @@ export interface RebalanceResult {
   before: {
     walletUsdc: number;
     lendUsdc: number;
+    lendPrincipalUsdc: number;
+    accruedYieldUsdc: number;
     hedgesCount: number;
+  };
+  yieldWithdrawal: {
+    attempted: number;
+    confirmedSignature: string | null;
+    error: string | null;
   };
   budget: {
     totalAvailableUsdc: number;
@@ -144,12 +158,26 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
       const sweep = await runClaimSweep();
       if (sweep.claimed.length > 0) {
         log.info(
-          { claimed: sweep.claimed.length, totalPayout: sweep.claimed.reduce((s, c) => s + c.payoutUsd, 0) },
+          {
+            claimed: sweep.claimed.length,
+            totalPayout: sweep.totalPayoutUsd,
+            distributed: sweep.totalDistributedToDepositors,
+          },
           'Pre-rebalance claim sweep',
         );
       }
     } catch (err) {
       log.warn({ err }, 'Pre-rebalance claim sweep failed (non-fatal)');
+    }
+
+    // 0.5) Settle any pending depositor withdrawals before we plan new hedges.
+    try {
+      const result = await processPendingWithdrawals();
+      if (result.attempted > 0) {
+        log.info(result, 'Pre-rebalance withdrawal settlement');
+      }
+    } catch (err) {
+      log.warn({ err }, 'Pre-rebalance withdrawal settlement failed (non-fatal)');
     }
   }
 
@@ -157,7 +185,7 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
   const wallet = getVaultWallet();
   const conn = getSolanaConnection();
 
-  const [lendPosition, currentPositionsRes, walletUsdc] = await Promise.all([
+  const [lendPosition, currentPositionsRes, walletUsdcInitial] = await Promise.all([
     readUsdcEarnPosition().catch(() => null),
     listVaultPositions().catch(() => ({ data: [] })),
     fetchVaultUsdcBalance().catch(() => 0),
@@ -166,20 +194,83 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
 
   const heldMarkets = new Set(currentPositions.map((p) => p.marketId));
 
+  // Compute principal vs accrued yield in the Lend position.
+  // Principal is what depositors collectively contributed (sum of deposit rows
+  // that haven't been withdrawn). The lend position's underlying value above
+  // principal is yield we have the right to withdraw and route to hedges.
+  const lendUsdc = lendPosition?.underlyingUsdc ?? 0;
+  const principalContributed = getTotalContributed();
+  // Cap principal at the actual lend position — depositors might have contributed
+  // more than is currently in Lend if some sits as wallet USDC pre-rebalance.
+  const lendPrincipalUsdc = Math.min(principalContributed, lendUsdc);
+  const accruedYieldUsdc = Math.max(0, lendUsdc - lendPrincipalUsdc);
+
   log.info(
     {
       vault: wallet.pubkeyBase58,
-      walletUsdc,
-      lendUsdc: lendPosition?.underlyingUsdc ?? 0,
+      walletUsdc: walletUsdcInitial,
+      lendUsdc,
+      lendPrincipalUsdc,
+      accruedYieldUsdc,
       heldMarketCount: heldMarkets.size,
     },
     'Rebalance tick — snapshot',
   );
 
-  // 2) Compute budgets. Treat the wallet's free USDC as "available capital":
-  //    fresh deposits + claimed payouts + accrued-but-withdrawn yield all land here.
-  //    We deliberately keep a tiny dust reserve so Lend redemption rounding doesn't
-  //    leave the wallet with literally zero.
+  // 2) Yield-to-hedge composition (the flagship Ballast claim):
+  //    Withdraw accrued yield from Lend Earn. After this, the hedge budget reflects
+  //    actual yield (or actual deposits the depositor table already accounts for),
+  //    not "all wallet USDC happens to be there for some reason."
+  let yieldWithdrawalResult: RebalanceResult['yieldWithdrawal'] = {
+    attempted: 0,
+    confirmedSignature: null,
+    error: null,
+  };
+  let walletUsdc = walletUsdcInitial;
+  // Only attempt yield withdrawal if there's enough yield to be worth a tx
+  // (Solana fees + Lend rounding combined are ~$0.001, but avoid the
+  //  call entirely below 1 cent of yield).
+  const minYieldWithdrawUsdc = 0.01;
+  if (!options.dryRun && accruedYieldUsdc >= minYieldWithdrawUsdc) {
+    yieldWithdrawalResult = {
+      attempted: round6(accruedYieldUsdc),
+      confirmedSignature: null,
+      error: null,
+    };
+    try {
+      const result = await withdrawUsdcFromLendEarn(round6(accruedYieldUsdc));
+      yieldWithdrawalResult.confirmedSignature = result.signature;
+      // Persist for audit
+      try {
+        getDb()
+          .insert(yieldWithdrawals)
+          .values({
+            amountUsdc: yieldWithdrawalResult.attempted,
+            txSignature: result.signature,
+            rebalanceStartedAt: startedAt,
+          })
+          .run();
+      } catch (err) {
+        log.warn({ err }, 'Failed to persist yield withdrawal row (non-fatal)');
+      }
+      // Refresh wallet balance to pick up the freshly-withdrawn yield.
+      walletUsdc = await fetchVaultUsdcBalance().catch(() => walletUsdcInitial);
+      log.info(
+        {
+          yieldUsdc: yieldWithdrawalResult.attempted,
+          newWalletUsdc: walletUsdc,
+        },
+        'Yield withdrawn from Lend Earn',
+      );
+    } catch (err) {
+      yieldWithdrawalResult.error = err instanceof Error ? err.message : String(err);
+      log.warn({ err: yieldWithdrawalResult.error }, 'Yield withdrawal failed (continuing)');
+    }
+  }
+
+  // 3) Compute budgets. With yield now in the wallet, split per HEDGE_BUDGET_FRACTION:
+  //    that share goes to hedges, the rest is compounded back to Lend.
+  //    Tiny dust reserve so Lend rounding doesn't leave the wallet at literally zero.
   const dustReserveUsdc = 0.01;
   const totalAvailableUsdc = Math.max(0, walletUsdc - dustReserveUsdc);
   const hedgeBudgetUsdc = totalAvailableUsdc * cfg.HEDGE_BUDGET_FRACTION;
@@ -278,18 +369,18 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
     'Rebalance tick — done',
   );
 
-  // Suppress unused-var lint; conn is plumbed for symmetry but the helpers fetch their own
-  void conn;
-
   return {
     startedAt,
     finishedAt,
     skipped: false,
     before: {
-      walletUsdc,
-      lendUsdc: lendPosition?.underlyingUsdc ?? 0,
+      walletUsdc: walletUsdcInitial,
+      lendUsdc,
+      lendPrincipalUsdc,
+      accruedYieldUsdc,
       hedgesCount: currentPositions.length,
     },
+    yieldWithdrawal: yieldWithdrawalResult,
     budget: {
       totalAvailableUsdc: round2(totalAvailableUsdc),
       hedgeBudgetUsdc: round2(hedgeBudgetUsdc),
@@ -301,18 +392,31 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
   };
 }
 
+void getSolanaConnection;
+
 function shortCircuit(args: { startedAt: number; reason: string }): RebalanceResult {
   return {
     startedAt: args.startedAt,
     finishedAt: args.startedAt,
     skipped: true,
     reason: args.reason,
-    before: { walletUsdc: 0, lendUsdc: 0, hedgesCount: 0 },
+    before: {
+      walletUsdc: 0,
+      lendUsdc: 0,
+      lendPrincipalUsdc: 0,
+      accruedYieldUsdc: 0,
+      hedgesCount: 0,
+    },
+    yieldWithdrawal: { attempted: 0, confirmedSignature: null, error: null },
     budget: { totalAvailableUsdc: 0, hedgeBudgetUsdc: 0, compoundBudgetUsdc: 0 },
     hedgesPlaced: [],
     hedgesSkipped: [],
     compounded: { attempted: 0, confirmedSignature: null, error: null },
   };
+}
+
+function round6(n: number): number {
+  return Math.round(n * 1_000_000) / 1_000_000;
 }
 
 async function fetchVaultUsdcBalance(): Promise<number> {

@@ -87,8 +87,67 @@ export const observations = sqliteTable('observations', {
   errorMessage: text('error_message'),
 });
 
+/**
+ * Pro-rata payout allocations recorded when a hedge resolves and the vault claims.
+ * One row per (depositor, claim) pair; sum across all rows for a depositor is their
+ * total accrued payout entitlement.
+ */
+export const claimDistributions = sqliteTable('claim_distributions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  positionPubkey: text('position_pubkey').notNull(),
+  depositorWallet: text('depositor_wallet')
+    .notNull()
+    .references(() => depositors.wallet),
+  /** Depositor's pro-rata share fraction at distribution time, in [0, 1]. */
+  shareFraction: real('share_fraction').notNull(),
+  /** Dollar amount allocated to this depositor (= totalPayout × shareFraction). */
+  amountUsd: real('amount_usd').notNull(),
+  claimSignature: text('claim_signature').notNull(),
+  distributedAt: integer('distributed_at')
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Server-issued nonces for sign-message authentication. Used by the deposit-confirm
+ * endpoint to prove the caller controls the depositorPubkey they're claiming.
+ *
+ * Lifecycle: server issues → stored with createdAt → client signs `(nonce, signature, amount)`
+ * → server verifies signature against the depositorPubkey and consumes the nonce.
+ * Consumed nonces are kept for audit but cannot be re-used.
+ */
+export const nonces = sqliteTable('nonces', {
+  nonce: text('nonce').primaryKey(),
+  /** The wallet this nonce is bound to (server commits this at issue time). */
+  wallet: text('wallet').notNull(),
+  createdAt: integer('created_at')
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  consumedAt: integer('consumed_at'),
+  /** What the nonce was used for, e.g. 'deposit-confirm', 'withdrawal'. */
+  purpose: text('purpose').notNull(),
+});
+
+/**
+ * Yield withdrawals from Lend Earn that fund the rebalance loop's hedge bucket.
+ * Audit trail for the "yield finances hedges" composition — one row per yield-extraction
+ * during a rebalance tick.
+ */
+export const yieldWithdrawals = sqliteTable('yield_withdrawals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  amountUsdc: real('amount_usdc').notNull(),
+  txSignature: text('tx_signature').notNull(),
+  rebalanceStartedAt: integer('rebalance_started_at').notNull(),
+  performedAt: integer('performed_at')
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export type Depositor = typeof depositors.$inferSelect;
 export type Deposit = typeof deposits.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
 export type Hedge = typeof hedges.$inferSelect;
 export type Observation = typeof observations.$inferSelect;
+export type ClaimDistribution = typeof claimDistributions.$inferSelect;
+export type Nonce = typeof nonces.$inferSelect;
+export type YieldWithdrawal = typeof yieldWithdrawals.$inferSelect;

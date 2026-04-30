@@ -9,8 +9,10 @@ import {
   getAccount,
   getAssociatedTokenAddress,
 } from '@solana/spl-token';
+import bs58 from 'bs58';
 import { ConnectButton } from './ConnectButton';
 import { ExternalLink } from './ExternalLink';
+import { buildCanonicalMessage, requestNonce, type NoncePurpose } from '@/lib/auth';
 
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 const USDC_DECIMALS = 6;
@@ -25,13 +27,14 @@ type Phase =
   | { kind: 'idle' }
   | { kind: 'sending' }
   | { kind: 'confirming'; signature: string }
+  | { kind: 'authenticating'; signature: string }
   | { kind: 'recording'; signature: string }
   | { kind: 'success'; signature: string }
   | { kind: 'error'; message: string; signature?: string };
 
 export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps) {
   const { connection } = useConnection();
-  const { publicKey, connected, sendTransaction } = useWallet();
+  const { publicKey, connected, sendTransaction, signMessage } = useWallet();
   const [amount, setAmount] = useState<string>('5');
   const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -67,6 +70,14 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
 
   const submit = useCallback(async () => {
     if (!publicKey || !validAmount) return;
+    if (!signMessage) {
+      setPhase({
+        kind: 'error',
+        message:
+          'Your wallet does not support sign-message. Switch to Phantom, Solflare, or Backpack.',
+      });
+      return;
+    }
     setPhase({ kind: 'sending' });
     try {
       const vaultPubkey = new PublicKey(vaultAddress);
@@ -75,8 +86,7 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
 
       const tx = new Transaction();
 
-      // Create the vault's USDC ATA if it doesn't exist yet (rare — vault was funded by us
-      // earlier, so its ATA exists — but we keep this branch for first-time vaults).
+      // Create the vault's USDC ATA if it doesn't exist yet.
       try {
         await getAccount(connection, toAta);
       } catch {
@@ -113,6 +123,23 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
         'confirmed',
       );
 
+      // Sign the deposit-confirm proof with the wallet so the orchestrator can
+      // verify ownership of depositorPubkey before crediting the share.
+      setPhase({ kind: 'authenticating', signature });
+      const purpose: NoncePurpose = 'deposit-confirm';
+      const { nonce } = await requestNonce(orchestratorUrl, {
+        wallet: publicKey.toBase58(),
+        purpose,
+      });
+      const message = buildCanonicalMessage({
+        purpose,
+        nonce,
+        bindings: { signature, amount: numericAmount.toFixed(6) },
+      });
+      const messageBytes = new TextEncoder().encode(message);
+      const proofBytes = await signMessage(messageBytes);
+      const signedProof = bs58.encode(proofBytes);
+
       setPhase({ kind: 'recording', signature });
       const res = await fetch(`${orchestratorUrl}/api/deposits/confirm`, {
         method: 'POST',
@@ -121,6 +148,8 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
           signature,
           depositorPubkey: publicKey.toBase58(),
           amount: numericAmount,
+          nonce,
+          signedProof,
         }),
       });
       if (!res.ok) {
@@ -142,10 +171,24 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
       setPhase((prev) => ({
         kind: 'error',
         message,
-        signature: prev.kind === 'confirming' || prev.kind === 'recording' ? prev.signature : undefined,
+        signature:
+          prev.kind === 'confirming' ||
+          prev.kind === 'authenticating' ||
+          prev.kind === 'recording'
+            ? prev.signature
+            : undefined,
       }));
     }
-  }, [publicKey, validAmount, vaultAddress, connection, sendTransaction, numericAmount, orchestratorUrl]);
+  }, [
+    publicKey,
+    validAmount,
+    vaultAddress,
+    connection,
+    sendTransaction,
+    signMessage,
+    numericAmount,
+    orchestratorUrl,
+  ]);
 
   return (
     <div className="card p-6">
@@ -218,6 +261,7 @@ export function DepositForm({ vaultAddress, orchestratorUrl }: DepositFormProps)
               !validAmount ||
               phase.kind === 'sending' ||
               phase.kind === 'confirming' ||
+              phase.kind === 'authenticating' ||
               phase.kind === 'recording'
             }
             className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-sm font-medium text-white hover:bg-[var(--accent-bright)] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -271,6 +315,8 @@ function phaseLabel(phase: Phase, amount: number): string {
       return 'Awaiting wallet signature…';
     case 'confirming':
       return 'Confirming on Solana…';
+    case 'authenticating':
+      return 'Signing proof of ownership…';
     case 'recording':
       return 'Recording with orchestrator…';
     case 'success':

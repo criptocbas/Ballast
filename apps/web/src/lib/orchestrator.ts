@@ -75,9 +75,29 @@ export interface DxObservationsResponse {
   observations: ApiObservation[];
 }
 
+export interface DepositorMeResponse {
+  wallet: string;
+  contributedUsdc: number;
+  sharePct: number;
+  payoutsAccruedUsdc: number;
+  balance: {
+    contributed: number;
+    withdrawn: number;
+    payouts: number;
+    net: number;
+  };
+}
+
+export interface VaultAggregateResponse {
+  depositorCount: number;
+  totalContributedUsdc: number;
+}
+
 export const orchestrator = {
   vaultInfo: () => get<VaultInfo>('/vault/info'),
+  vaultAggregate: () => get<VaultAggregateResponse>('/vault/aggregate'),
   lendTokens: () => get<LendTokensResponse>('/lend/tokens'),
   dxObservations: (limit = 100) => get<DxObservationsResponse>(`/dx/observations?limit=${limit}`),
   health: () => get<{ status: string; cluster: string }>('/health'),
+  me: (wallet: string) => get<DepositorMeResponse>(`/api/me/${encodeURIComponent(wallet)}`),
 };

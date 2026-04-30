@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import { deposits, depositors, withdrawals } from './db/schema.js';
+import { claimDistributions, deposits, depositors, withdrawals } from './db/schema.js';
 import { getDb } from './db/index.js';
 
 /**
@@ -135,4 +135,103 @@ export function queueWithdrawal(args: WithdrawalRequest): { id: number } {
     .returning({ id: withdrawals.id })
     .get();
   return { id: row.id };
+}
+
+export interface DistributionAllocation {
+  depositorWallet: string;
+  shareFraction: number;
+  amountUsd: number;
+}
+
+/**
+ * Distribute a claim payout pro-rata across depositors based on share fraction.
+ * Returns the per-depositor allocations and persists them in claim_distributions.
+ *
+ * NOTE: this records *entitlement*. Actual on-chain disbursement happens via the
+ * withdrawal flow — depositors withdraw their accumulated entitlement on demand.
+ */
+export function distributeClaimPayout(args: {
+  positionPubkey: string;
+  claimSignature: string;
+  totalPayoutUsd: number;
+}): DistributionAllocation[] {
+  const db = getDb();
+  if (args.totalPayoutUsd <= 0) return [];
+
+  const totalContributed = getTotalContributed();
+  if (totalContributed <= 0) return [];
+
+  const rows = db
+    .select({
+      wallet: depositors.wallet,
+      total: sql<number>`coalesce(sum(${deposits.amountUsdc}), 0)`,
+    })
+    .from(depositors)
+    .leftJoin(deposits, eq(deposits.depositorWallet, depositors.wallet))
+    .groupBy(depositors.wallet)
+    .all();
+
+  const allocations: DistributionAllocation[] = [];
+  const inserts = rows
+    .filter((r) => Number(r.total ?? 0) > 0)
+    .map((r) => {
+      const fraction = Number(r.total) / totalContributed;
+      const amount = args.totalPayoutUsd * fraction;
+      allocations.push({
+        depositorWallet: r.wallet,
+        shareFraction: fraction,
+        amountUsd: amount,
+      });
+      return {
+        positionPubkey: args.positionPubkey,
+        depositorWallet: r.wallet,
+        shareFraction: fraction,
+        amountUsd: amount,
+        claimSignature: args.claimSignature,
+      };
+    });
+
+  if (inserts.length > 0) {
+    db.insert(claimDistributions).values(inserts).run();
+  }
+  return allocations;
+}
+
+/**
+ * Total payout entitlement a depositor has accumulated across all claim distributions.
+ */
+export function getDepositorClaimTotal(wallet: string): number {
+  const db = getDb();
+  const row = db
+    .select({ total: sql<number>`coalesce(sum(${claimDistributions.amountUsd}), 0)` })
+    .from(claimDistributions)
+    .where(eq(claimDistributions.depositorWallet, wallet))
+    .get();
+  return Number(row?.total ?? 0);
+}
+
+/**
+ * Net depositor balance: contributed principal − settled withdrawals + payout entitlements.
+ */
+export function getDepositorNetBalance(wallet: string): {
+  contributed: number;
+  withdrawn: number;
+  payouts: number;
+  net: number;
+} {
+  const db = getDb();
+  const contributed = getDepositorTotal(wallet);
+  const withdrawnRow = db
+    .select({ total: sql<number>`coalesce(sum(${withdrawals.amountUsdc}), 0)` })
+    .from(withdrawals)
+    .where(eq(withdrawals.depositorWallet, wallet))
+    .get();
+  const withdrawn = Number(withdrawnRow?.total ?? 0);
+  const payouts = getDepositorClaimTotal(wallet);
+  return {
+    contributed,
+    withdrawn,
+    payouts,
+    net: contributed - withdrawn + payouts,
+  };
 }

@@ -3,6 +3,7 @@ import { Logo } from './Logo';
 
 const NAV_ITEMS: ReadonlyArray<{ href: string; label: string }> = [
   { href: '/vault', label: 'Vault' },
+  { href: '/me', label: 'You' },
   { href: '/dx', label: 'DX log' },
   { href: '/about', label: 'About' },
 ];

@@ -5,6 +5,7 @@ import { getSolanaConnection, getVaultWallet } from './wallet.js';
 import { getDb } from './db/index.js';
 import { hedges as hedgesTable } from './db/schema.js';
 import { createLogger } from './logger.js';
+import { distributeClaimPayout, type DistributionAllocation } from './accountant.js';
 
 const log = createLogger('claimer');
 
@@ -30,6 +31,7 @@ export interface ClaimResult {
   signature: string;
   payoutUsd: number;
   marketId: string;
+  distributions: DistributionAllocation[];
 }
 
 export interface ClaimSweepResult {
@@ -37,6 +39,8 @@ export interface ClaimSweepResult {
   finishedAt: number;
   claimable: number;
   claimed: ClaimResult[];
+  totalPayoutUsd: number;
+  totalDistributedToDepositors: number;
   errors: Array<{ positionPubkey: string; error: string }>;
 }
 
@@ -97,11 +101,36 @@ export async function claimPosition(positionPubkey: string): Promise<ClaimResult
     log.warn({ err, positionPubkey }, 'Failed to update hedge row after claim (non-fatal)');
   }
 
+  // Pro-rata distribute the payout across depositors. Recorded as entitlements;
+  // actual disbursement happens via the withdrawal flow.
+  let distributions: DistributionAllocation[] = [];
+  try {
+    distributions = distributeClaimPayout({
+      positionPubkey,
+      claimSignature: signature,
+      totalPayoutUsd: payoutUsd,
+    });
+    if (distributions.length > 0) {
+      log.info(
+        {
+          positionPubkey,
+          payoutUsd,
+          depositors: distributions.length,
+          totalAllocated: distributions.reduce((s, d) => s + d.amountUsd, 0),
+        },
+        'Payout distributed to depositors',
+      );
+    }
+  } catch (err) {
+    log.warn({ err, positionPubkey }, 'Payout distribution failed (non-fatal)');
+  }
+
   return {
     positionPubkey,
     signature,
     payoutUsd,
     marketId: '', // filled by sweep when caller has it; manual single-claim leaves blank
+    distributions,
   };
 }
 
@@ -129,6 +158,8 @@ export async function runClaimSweep(): Promise<ClaimSweepResult> {
       finishedAt: Date.now(),
       claimable: 0,
       claimed: [],
+      totalPayoutUsd: 0,
+      totalDistributedToDepositors: 0,
       errors: [
         {
           positionPubkey: '*',
@@ -162,11 +193,19 @@ export async function runClaimSweep(): Promise<ClaimSweepResult> {
     }
   }
 
+  const totalPayoutUsd = claimed.reduce((s, c) => s + c.payoutUsd, 0);
+  const totalDistributedToDepositors = claimed.reduce(
+    (s, c) => s + c.distributions.reduce((d, alloc) => d + alloc.amountUsd, 0),
+    0,
+  );
+
   return {
     startedAt,
     finishedAt: Date.now(),
     claimable,
     claimed,
+    totalPayoutUsd,
+    totalDistributedToDepositors,
     errors,
   };
 }

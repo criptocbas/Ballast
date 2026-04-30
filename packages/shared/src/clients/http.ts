@@ -60,6 +60,11 @@ export class JupiterHttpClient {
     return this.request<T>('POST', path, url, body);
   }
 
+  async delete<T>(path: string, body?: unknown): Promise<T> {
+    const url = `${this.baseUrl}${path}`;
+    return this.request<T>('DELETE', path, url, body);
+  }
+
   private async request<T>(method: string, path: string, url: string, body?: unknown): Promise<T> {
     const startedAt = Date.now();
     const headers: Record<string, string> = {

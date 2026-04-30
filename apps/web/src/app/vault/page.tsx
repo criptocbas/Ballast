@@ -147,16 +147,34 @@ export default async function VaultPage() {
       )}
 
       <section className="mt-14">
-        <h2 className="text-xl font-semibold tracking-tight">Hedges</h2>
-        <p className="mt-2 text-sm text-[var(--fg-dim)]">
-          Open NO-contract positions on tail-risk prediction markets. Populated by the rebalance
-          loop — coming online with the next orchestrator deploy.
-        </p>
-        <div className="mt-5 rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
-          <p className="font-mono text-sm text-[var(--fg-muted)]">
-            Awaiting first rebalance. Vault must be funded and rebalance loop scheduled.
-          </p>
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">Hedges</h2>
+            <p className="mt-2 text-sm text-[var(--fg-dim)]">
+              Open prediction-market positions financed by the vault&apos;s yield.
+            </p>
+          </div>
+          {vault?.hedges.length ? (
+            <span className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">
+              {vault.hedges.length} position{vault.hedges.length === 1 ? '' : 's'}
+            </span>
+          ) : null}
         </div>
+        {vault && vault.hedges.length === 0 ? (
+          <div className="mt-5 rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
+            <p className="font-mono text-sm text-[var(--fg-muted)]">
+              No open hedges yet. Run{' '}
+              <code className="text-fg">scripts/openHedge.ts</code> or wait for the rebalance loop.
+            </p>
+          </div>
+        ) : null}
+        {vault && vault.hedges.length > 0 ? (
+          <div className="mt-5 grid gap-3">
+            {vault.hedges.map((h) => (
+              <HedgeCard key={h.positionPubkey} hedge={h} />
+            ))}
+          </div>
+        ) : null}
       </section>
     </div>
   );
@@ -186,6 +204,76 @@ function Stat({ label, value, mono = false, small = false, tone = 'default' }: S
         className={`mt-2 ${small ? 'text-base' : 'text-2xl'} font-medium ${toneClass} ${mono ? 'font-mono tabular-nums' : ''}`}
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+interface HedgeCardProps {
+  hedge: import('@/lib/orchestrator').HedgeSummary;
+}
+
+function HedgeCard({ hedge }: HedgeCardProps) {
+  const closeDate = hedge.closeTime ? new Date(hedge.closeTime * 1000) : null;
+  const sideStyle =
+    hedge.side === 'NO'
+      ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+  const pnlPositive = hedge.pnlUsd >= 0;
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${sideStyle}`}
+            >
+              {hedge.side}
+            </span>
+            <span className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">
+              Hedge
+            </span>
+          </div>
+          <h3 className="mt-2 text-base font-medium">{hedge.eventTitle}</h3>
+          <p className="mt-0.5 text-sm text-[var(--fg-dim)]">{hedge.marketTitle}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">Value</div>
+          <div className="mt-1 font-mono tabular-nums text-lg font-semibold">
+            ${hedge.valueUsd.toFixed(2)}
+          </div>
+          <div
+            className={`text-xs font-mono tabular-nums ${pnlPositive ? 'text-emerald-400' : 'text-rose-400'}`}
+          >
+            {pnlPositive ? '+' : ''}${hedge.pnlUsd.toFixed(2)} (
+            {pnlPositive ? '+' : ''}
+            {hedge.pnlPct.toFixed(1)}%)
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-[var(--border)] pt-3 text-xs sm:grid-cols-4">
+        <div>
+          <div className="uppercase tracking-wider text-[var(--fg-muted)]">Contracts</div>
+          <div className="font-mono tabular-nums text-fg">{hedge.contracts}</div>
+        </div>
+        <div>
+          <div className="uppercase tracking-wider text-[var(--fg-muted)]">Avg / Mark</div>
+          <div className="font-mono tabular-nums text-fg">
+            ${hedge.avgPriceUsd.toFixed(3)} / ${hedge.markPriceUsd.toFixed(3)}
+          </div>
+        </div>
+        <div>
+          <div className="uppercase tracking-wider text-[var(--fg-muted)]">Cost basis</div>
+          <div className="font-mono tabular-nums text-fg">
+            ${hedge.costBasisUsd.toFixed(2)}
+          </div>
+        </div>
+        <div>
+          <div className="uppercase tracking-wider text-[var(--fg-muted)]">Resolves</div>
+          <div className="font-mono tabular-nums text-fg">
+            {closeDate ? closeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+          </div>
+        </div>
       </div>
     </div>
   );

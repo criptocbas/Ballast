@@ -31,6 +31,23 @@ export interface LendPositionSummary {
   totalApyBps: number;
 }
 
+export interface HedgeSummary {
+  positionPubkey: string;
+  marketId: string;
+  eventTitle: string;
+  marketTitle: string;
+  side: 'YES' | 'NO';
+  contracts: number;
+  costBasisUsd: number;
+  valueUsd: number;
+  pnlUsd: number;
+  pnlPct: number;
+  avgPriceUsd: number;
+  markPriceUsd: number;
+  claimable: boolean;
+  closeTime: number | null;
+}
+
 export interface VaultInfo {
   address: string;
   cluster: string;
@@ -38,6 +55,7 @@ export interface VaultInfo {
   solBalanceLamports: number;
   solscanUrl: string;
   lendPosition: LendPositionSummary | null;
+  hedges: HedgeSummary[];
 }
 
 export interface LendTokenSummary {

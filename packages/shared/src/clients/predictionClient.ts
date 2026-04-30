@@ -1,4 +1,10 @@
 import type {
+  ClosePositionRequest,
+  ClosePositionResponse,
+  CreateOrderRequest,
+  CreateOrderResponse,
+  ListPositionsResponse,
+  OrderStatusResponse,
   PredictionEvent,
   PredictionEventsResponse,
   PredictionMarket,
@@ -11,6 +17,11 @@ export interface ListEventsOptions {
   start?: number;
   category?: string;
   subcategory?: string;
+  /** "live", "trending", "new", etc. — see /prediction/v1/events. */
+  filter?: string;
+  /** Free-text search by event title. */
+  search?: string;
+  sort?: 'volume' | 'volume24h' | 'recent';
 }
 
 /**
@@ -27,6 +38,9 @@ export class PredictionClient {
       start: options.start,
       category: options.category,
       subcategory: options.subcategory,
+      filter: options.filter,
+      search: options.search,
+      sort: options.sort,
     });
   }
 
@@ -52,6 +66,36 @@ export class PredictionClient {
   async getOrderbook(marketId: string): Promise<PredictionOrderbook> {
     return this.http.get<PredictionOrderbook>(
       `/prediction/v1/orderbook/${encodeURIComponent(marketId)}`,
+    );
+  }
+
+  /** POST /prediction/v1/orders — returns a base64 tx caller must sign and submit. */
+  async createOrder(req: CreateOrderRequest): Promise<CreateOrderResponse> {
+    return this.http.post<CreateOrderResponse>('/prediction/v1/orders', req);
+  }
+
+  /** GET /prediction/v1/orders/status/{orderPubkey} — poll a submitted order's fill status. */
+  async getOrderStatus(orderPubkey: string): Promise<OrderStatusResponse> {
+    return this.http.get<OrderStatusResponse>(
+      `/prediction/v1/orders/status/${encodeURIComponent(orderPubkey)}`,
+    );
+  }
+
+  /** GET /prediction/v1/positions?ownerPubkey=... — list all open positions for a wallet. */
+  async listPositions(ownerPubkey: string): Promise<ListPositionsResponse> {
+    return this.http.get<ListPositionsResponse>('/prediction/v1/positions', {
+      ownerPubkey,
+    });
+  }
+
+  /** DELETE /prediction/v1/positions/{positionPubkey} — returns a base64 tx that closes the position. */
+  async closePosition(
+    positionPubkey: string,
+    body: ClosePositionRequest,
+  ): Promise<ClosePositionResponse> {
+    return this.http.delete<ClosePositionResponse>(
+      `/prediction/v1/positions/${encodeURIComponent(positionPubkey)}`,
+      body,
     );
   }
 }

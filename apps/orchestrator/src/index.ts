@@ -6,6 +6,7 @@ import { readRecentObservations } from './eventLog.js';
 import { bpsToPercentString, microToUsd } from '@reflux/shared';
 import { getVaultSolBalance, getVaultWallet } from './wallet.js';
 import { readUsdcEarnPosition } from './lend.js';
+import { listVaultPositions } from './prediction.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -25,10 +26,29 @@ server.get('/health', async () => ({ status: 'ok', cluster: cfg.SOLANA_CLUSTER }
 
 server.get('/vault/info', async () => {
   const wallet = getVaultWallet();
-  const [sol, lendPosition] = await Promise.all([
+  const [sol, lendPosition, hedgePositionsResponse] = await Promise.all([
     getVaultSolBalance(),
     readUsdcEarnPosition().catch(() => null),
+    listVaultPositions().catch((): null => null),
   ]);
+  const hedges =
+    hedgePositionsResponse?.data.map((p) => ({
+      positionPubkey: p.pubkey,
+      marketId: p.marketId,
+      eventTitle: p.eventMetadata?.title ?? 'Unknown event',
+      marketTitle: p.marketMetadata?.title ?? p.marketId,
+      side: p.isYes ? ('YES' as const) : ('NO' as const),
+      contracts: Number(p.contracts),
+      costBasisUsd: Number(p.totalCostUsd) / 1_000_000,
+      valueUsd: Number(p.valueUsd) / 1_000_000,
+      pnlUsd: Number(p.pnlUsd) / 1_000_000,
+      pnlPct: p.pnlUsdPercent,
+      avgPriceUsd: Number(p.avgPriceUsd) / 1_000_000,
+      markPriceUsd: Number(p.markPriceUsd) / 1_000_000,
+      claimable: p.claimed,
+      closeTime: p.marketMetadata?.closeTime ?? null,
+    })) ?? [];
+
   return {
     address: wallet.pubkeyBase58,
     cluster: cfg.SOLANA_CLUSTER,
@@ -44,6 +64,7 @@ server.get('/vault/info', async () => {
           totalApyBps: lendPosition.totalApyBps,
         }
       : null,
+    hedges,
   };
 });
 

@@ -10,6 +10,11 @@ import { listVaultPositions } from './prediction.js';
 import { DepositVerifyError, verifyDeposit } from './deposits.js';
 import { getDepositorTotal, listDepositors, recordDeposit } from './accountant.js';
 import { getDb } from './db/index.js';
+import {
+  listPersistedHedges,
+  runRebalanceTick,
+  scheduleRebalanceCron,
+} from './rebalance.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -119,6 +124,45 @@ server.post('/api/deposits/confirm', async (req, reply) => {
   }
 });
 
+server.post<{ Body: { dryRun?: boolean; minIntervalMs?: number; skipCompound?: boolean } | undefined }>(
+  '/rebalance/trigger',
+  async (req) => {
+    const body = (req.body ?? {}) as {
+      dryRun?: boolean;
+      minIntervalMs?: number;
+      skipCompound?: boolean;
+    };
+    const opts: Parameters<typeof runRebalanceTick>[0] = {};
+    if (typeof body.dryRun === 'boolean') opts.dryRun = body.dryRun;
+    if (typeof body.minIntervalMs === 'number') opts.minIntervalMs = body.minIntervalMs;
+    if (typeof body.skipCompound === 'boolean') opts.skipCompound = body.skipCompound;
+    return runRebalanceTick(opts);
+  },
+);
+
+server.get('/rebalance/preview', async () => {
+  // Dry-run with cooldown disabled so callers can preview without affecting state.
+  return runRebalanceTick({ dryRun: true, minIntervalMs: 0 });
+});
+
+server.get('/vault/hedges', async () => {
+  const rows = listPersistedHedges(100);
+  return {
+    hedges: rows.map((r) => ({
+      positionPubkey: r.positionPubkey,
+      marketId: r.marketId,
+      side: r.side,
+      contracts: r.contracts,
+      costBasisUsd: r.costBasisUsd,
+      openedAt: r.openedAt,
+      closedAt: r.closedAt,
+      resolvedOutcome: r.resolvedOutcome,
+      payoutUsd: r.payoutUsd,
+      openSignature: r.openSignature,
+    })),
+  };
+});
+
 server.get('/api/depositors', async () => {
   const rows = listDepositors();
   return {
@@ -179,6 +223,7 @@ server.get('/prediction/events', async (req) => {
 async function main(): Promise<void> {
   // Open the database eagerly so migrations apply before the first request.
   getDb();
+  scheduleRebalanceCron();
   await server.listen({ port: cfg.ORCHESTRATOR_PORT, host: '0.0.0.0' });
   log.info({ port: cfg.ORCHESTRATOR_PORT }, 'Ballast orchestrator listening');
 }

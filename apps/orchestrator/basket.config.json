@@ -1,0 +1,32 @@
+{
+  "$schema": "Curated tail-risk hedge basket for Ballast v1. Weights sum to 1.0. Each market is a Jupiter Prediction Market with NO-side ask < 0.5 (otherwise the hedge is too expensive to make sense at small order sizes).",
+  "minOrderSizeUsd": 5.0,
+  "minOrderbookDepthUsd": 2.0,
+  "markets": [
+    {
+      "marketId": "POLY-1345530",
+      "weight": 0.35,
+      "thesis": "BTC > $80k by EOY 2026 — buying NO is a hedge against a deep crypto drawdown."
+    },
+    {
+      "marketId": "POLY-573656",
+      "weight": 0.25,
+      "thesis": "BTC > $150k by EOY 2026 — buying NO at low premium ($0.11) reflects most of the downside without large capital lockup."
+    },
+    {
+      "marketId": "POLY-1345531",
+      "weight": 0.20,
+      "thesis": "BTC > $90k by EOY 2026 — closer-to-spot bullish strike; NO at ~$0.46 prices the market roughly even."
+    },
+    {
+      "marketId": "POLY-2113926-0",
+      "weight": 0.10,
+      "thesis": "Short-dated daily Up/Down for ETH — small allocation to test rapid resolution + claim flow during demos. Replace with the next live market when this one resolves."
+    },
+    {
+      "marketId": "POLY-2113925-0",
+      "weight": 0.10,
+      "thesis": "Short-dated daily Up/Down for BTC — same role as the ETH one."
+    }
+  ]
+}

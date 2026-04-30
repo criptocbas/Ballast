@@ -8,6 +8,8 @@ import { getVaultSolBalance, getVaultWallet } from './wallet.js';
 import { readUsdcEarnPosition } from './lend.js';
 import { listVaultPositions } from './prediction.js';
 import { DepositVerifyError, verifyDeposit } from './deposits.js';
+import { getDepositorTotal, listDepositors, recordDeposit } from './accountant.js';
+import { getDb } from './db/index.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -87,11 +89,24 @@ server.post('/api/deposits/confirm', async (req, reply) => {
   }
   try {
     const result = await verifyDeposit({ signature, depositorPubkey, amount: amountNum });
+    const recorded = recordDeposit({
+      wallet: depositorPubkey,
+      amountUsdc: amountNum,
+      txSignature: signature,
+      blockTime: result.blockTime,
+      slot: result.slot,
+    });
     log.info(
-      { signature: result.signature, depositorPubkey, amount: amountNum },
-      'Deposit verified on-chain',
+      {
+        signature: result.signature,
+        depositorPubkey,
+        amount: amountNum,
+        firstDeposit: recorded.firstDeposit,
+        inserted: recorded.inserted,
+      },
+      'Deposit verified and recorded',
     );
-    return result;
+    return { ...result, recorded };
   } catch (err) {
     if (err instanceof DepositVerifyError) {
       return reply.code(400).send({ error: err.code, message: err.message });
@@ -102,6 +117,24 @@ server.post('/api/deposits/confirm', async (req, reply) => {
       message: err instanceof Error ? err.message : 'unknown',
     });
   }
+});
+
+server.get('/api/depositors', async () => {
+  const rows = listDepositors();
+  return {
+    depositors: rows.map((r) => ({
+      wallet: r.wallet,
+      totalUsdc: r.totalUsdc,
+      joinedAt: r.joinedAt,
+    })),
+    totalDepositors: rows.length,
+    totalContributedUsdc: rows.reduce((sum, r) => sum + r.totalUsdc, 0),
+  };
+});
+
+server.get<{ Params: { wallet: string } }>('/api/depositors/:wallet', async (req) => {
+  const total = getDepositorTotal(req.params.wallet);
+  return { wallet: req.params.wallet, totalUsdc: total };
 });
 
 server.setNotFoundHandler((_req, reply) => {
@@ -144,8 +177,10 @@ server.get('/prediction/events', async (req) => {
 });
 
 async function main(): Promise<void> {
+  // Open the database eagerly so migrations apply before the first request.
+  getDb();
   await server.listen({ port: cfg.ORCHESTRATOR_PORT, host: '0.0.0.0' });
-  log.info({ port: cfg.ORCHESTRATOR_PORT }, 'Reflux orchestrator listening');
+  log.info({ port: cfg.ORCHESTRATOR_PORT }, 'Ballast orchestrator listening');
 }
 
 main().catch((err: unknown) => {

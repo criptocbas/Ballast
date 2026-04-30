@@ -23,6 +23,8 @@ keypairs/
 
 # SQLite databases
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.sqlite-journal
 *.db
 

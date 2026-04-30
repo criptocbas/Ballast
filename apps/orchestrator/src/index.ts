@@ -7,6 +7,7 @@ import { bpsToPercentString, microToUsd } from '@reflux/shared';
 import { getVaultSolBalance, getVaultWallet } from './wallet.js';
 import { readUsdcEarnPosition } from './lend.js';
 import { listVaultPositions } from './prediction.js';
+import { DepositVerifyError, verifyDeposit } from './deposits.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -66,6 +67,41 @@ server.get('/vault/info', async () => {
       : null,
     hedges,
   };
+});
+
+server.post('/api/deposits/confirm', async (req, reply) => {
+  const body = req.body as
+    | { signature?: unknown; depositorPubkey?: unknown; amount?: unknown }
+    | undefined;
+  if (!body) return reply.code(400).send({ error: 'missing_body' });
+  const { signature, depositorPubkey, amount } = body;
+  if (typeof signature !== 'string' || signature.length < 32) {
+    return reply.code(400).send({ error: 'invalid_signature' });
+  }
+  if (typeof depositorPubkey !== 'string' || depositorPubkey.length < 32) {
+    return reply.code(400).send({ error: 'invalid_depositor' });
+  }
+  const amountNum = typeof amount === 'number' ? amount : Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return reply.code(400).send({ error: 'invalid_amount' });
+  }
+  try {
+    const result = await verifyDeposit({ signature, depositorPubkey, amount: amountNum });
+    log.info(
+      { signature: result.signature, depositorPubkey, amount: amountNum },
+      'Deposit verified on-chain',
+    );
+    return result;
+  } catch (err) {
+    if (err instanceof DepositVerifyError) {
+      return reply.code(400).send({ error: err.code, message: err.message });
+    }
+    log.error({ err }, 'Deposit confirm failed');
+    return reply.code(500).send({
+      error: 'internal_error',
+      message: err instanceof Error ? err.message : 'unknown',
+    });
+  }
 });
 
 server.setNotFoundHandler((_req, reply) => {

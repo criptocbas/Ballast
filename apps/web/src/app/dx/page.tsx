@@ -59,7 +59,8 @@ export default async function DxLogPage() {
               <thead className="bg-[var(--bg-elev)] text-left text-[10px] uppercase tracking-wider text-[var(--fg-muted)]">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">When</th>
-                  <th className="px-4 py-2.5 font-medium">Method</th>
+                  <th className="px-3 py-2.5 font-medium">Family</th>
+                  <th className="px-3 py-2.5 font-medium">Method</th>
                   <th className="px-4 py-2.5 font-medium">Path</th>
                   <th className="px-4 py-2.5 font-medium text-right">Status</th>
                   <th className="px-4 py-2.5 font-medium text-right">Latency</th>
@@ -69,7 +70,7 @@ export default async function DxLogPage() {
                 {observations.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-4 py-12 text-center text-[var(--fg-muted)]"
                     >
                       No observations yet. The orchestrator records one per outbound Jupiter API
@@ -107,15 +108,59 @@ function ObservationRow({ obs }: { obs: ApiObservation }) {
       : obs.durationMs < 800
         ? 'text-amber-400'
         : 'text-rose-400';
+  const family = endpointFamily(obs.path);
   return (
     <tr className="hover:bg-[var(--bg-elev)]">
       <td className="px-4 py-2 text-[var(--fg-muted)] tabular-nums">{time}</td>
-      <td className="px-4 py-2 text-[var(--fg-dim)]">{obs.method}</td>
+      <td className="px-3 py-2">
+        <span
+          className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${family.style}`}
+        >
+          {family.label}
+        </span>
+      </td>
+      <td className="px-3 py-2 text-[var(--fg-dim)]">{obs.method}</td>
       <td className="px-4 py-2 text-fg">{obs.path}</td>
       <td className={`px-4 py-2 text-right tabular-nums ${statusColor}`}>{obs.status}</td>
       <td className={`px-4 py-2 text-right tabular-nums ${latencyColor}`}>{obs.durationMs}ms</td>
     </tr>
   );
+}
+
+interface FamilyTag {
+  label: string;
+  style: string;
+}
+
+function endpointFamily(path: string): FamilyTag {
+  if (path.startsWith('/lend/')) {
+    return { label: 'Lend', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
+  }
+  if (path.startsWith('/prediction/')) {
+    return { label: 'Predict', style: 'bg-amber-500/10 text-amber-400 border-amber-500/30' };
+  }
+  if (path.startsWith('/swap/')) {
+    return { label: 'Swap', style: 'bg-sky-500/10 text-sky-400 border-sky-500/30' };
+  }
+  if (path.startsWith('/tokens/')) {
+    return { label: 'Tokens', style: 'bg-violet-500/10 text-violet-400 border-violet-500/30' };
+  }
+  if (path.startsWith('/portfolio/')) {
+    return {
+      label: 'Portfolio',
+      style: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/30',
+    };
+  }
+  if (path.startsWith('/price/')) {
+    return { label: 'Price', style: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' };
+  }
+  if (path.startsWith('/tx/')) {
+    return { label: 'Tx', style: 'bg-rose-500/10 text-rose-400 border-rose-500/30' };
+  }
+  return {
+    label: 'Other',
+    style: 'bg-[var(--bg-elev-2)] text-[var(--fg-dim)] border-[var(--border)]',
+  };
 }
 
 interface MetricProps {

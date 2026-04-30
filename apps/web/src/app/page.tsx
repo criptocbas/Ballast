@@ -1,16 +1,21 @@
 import Link from 'next/link';
 import { StatusPill } from '@/components/StatusPill';
+import { LiveTvl } from '@/components/LiveTvl';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function HomePage() {
   return (
     <div className="flex flex-1 flex-col">
       <section className="hero-glow relative overflow-hidden border-b border-[var(--border)]">
-        <div className="mx-auto max-w-6xl px-6 pt-24 pb-32">
+        <div className="mx-auto max-w-6xl px-6 pt-24 pb-28 sm:pt-32 sm:pb-36">
           <StatusPill pulse>Live on Solana mainnet</StatusPill>
-          <h1 className="mt-6 max-w-3xl text-balance text-5xl font-semibold tracking-tight text-fg sm:text-6xl">
-            Yield with a built-in tail-risk hedge.
+          <h1 className="mt-7 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight text-fg sm:text-[64px]">
+            Yield with a <span className="text-[var(--accent-bright)]">built-in</span> tail-risk
+            hedge.
           </h1>
-          <p className="mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-[var(--fg-dim)]">
+          <p className="mt-7 max-w-2xl text-pretty text-lg leading-relaxed text-[var(--fg-dim)]">
             Ballast deposits your USDC into Jupiter Lend Earn, then routes the yield it generates
             into NO-contract hedges on tail-risk prediction markets. In normal times you keep the
             residual yield; if a hedged event hits, the payout sweeps back to depositors.
@@ -18,7 +23,7 @@ export default function HomePage() {
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <Link
               href="/deposit"
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-sm font-medium text-white hover:bg-[var(--accent)]/90 transition-colors"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-5 text-sm font-medium text-white hover:bg-[var(--accent-bright)] transition-colors"
             >
               Deposit USDC
               <span aria-hidden>→</span>
@@ -30,7 +35,8 @@ export default function HomePage() {
               See live vault
             </Link>
           </div>
-          <p className="mt-8 text-xs uppercase tracking-[0.18em] text-[var(--fg-muted)]">
+          <LiveTvl />
+          <p className="mt-12 text-xs uppercase tracking-[0.18em] text-[var(--fg-muted)]">
             Built for the Solana Frontier Hackathon · Jupiter sidetrack
           </p>
         </div>

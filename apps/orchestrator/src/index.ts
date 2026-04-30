@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import cors from '@fastify/cors';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { getJupiterClients } from './jupiter.js';
@@ -426,6 +427,20 @@ server.setErrorHandler((err, _req, reply) => {
 });
 
 async function main(): Promise<void> {
+  // CORS: allow the browser-side web app to call us. Localhost ports during dev,
+  // plus an optional WEB_ORIGIN env override for deployed environments.
+  await server.register(cors, {
+    origin: [
+      /^https?:\/\/localhost(:\d+)?$/,
+      /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+      ...(process.env.WEB_ORIGIN ? [process.env.WEB_ORIGIN] : []),
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token'],
+    maxAge: 86_400,
+  });
+
   // Open the database eagerly so migrations apply before the first request.
   getDb();
   scheduleRebalanceCron();

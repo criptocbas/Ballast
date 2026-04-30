@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
     "@jup-ag/lend": "^0.1.9",
     "@jup-ag/lend-read": "^0.0.12",
     "@reflux/shared": "workspace:*",

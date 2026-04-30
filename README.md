@@ -34,44 +34,86 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the system design and [`docs/bran
 
 ---
 
-## Development
+## How to run
+
+**Prerequisites:** Node 22+, pnpm 10+, a Jupiter API key from [developers.jup.ag/portal](https://developers.jup.ag/portal), and a Solana wallet keypair holding USDC + a little SOL for gas (mainnet).
+
+### 1) Install + configure
 
 ```bash
-# install
 pnpm install
 
-# build the shared package (orchestrator + web depend on it)
-pnpm build:shared
-
-# run the orchestrator and frontend in two terminals
-pnpm dev:orchestrator   # http://localhost:4000
-pnpm dev:web            # http://localhost:3000
+# Copy the template and fill in your keys (gitignored, never commit)
+cp .env.example .env
+$EDITOR .env  # set JUPITER_API_KEY, SOLANA_RPC_URL, VAULT_KEYPAIR_BASE58
 ```
 
-Configuration lives in `.env` at the repo root (see [`.env.example`](./.env.example)). The Jupiter API key, Solana RPC, and vault keypair all read from there.
+You'll need a paid RPC for production-quality reads — the public `api.mainnet-beta.solana.com` will rate-limit a single rebalance flow within seconds. Helius free tier or QuickNode developer tier are both adequate; just set `SOLANA_RPC_URL` accordingly.
 
-### Useful scripts
+### 2) Boot the orchestrator and the web app
 
 ```bash
-# inspect the vault's current on-chain balances
+# Terminal 1
+pnpm dev:orchestrator        # http://localhost:4000
+
+# Terminal 2
+pnpm dev:web                 # http://localhost:3000
+```
+
+The orchestrator opens SQLite, runs migrations on first boot, schedules the rebalance cron, and starts serving the HTTP API. The web app reads `/vault/info`, `/lend/tokens`, and `/dx/observations` directly from the orchestrator.
+
+### 3) Inspect / operate the vault
+
+```bash
+# Vault on-chain balances (SOL + SPL tokens)
 pnpm --filter @reflux/orchestrator exec tsx src/scripts/checkVaultBalance.ts
 
-# deposit USDC into Jupiter Lend Earn (--dry-run simulates)
+# Print the vault public key (handy for funding)
+pnpm --filter @reflux/orchestrator exec tsx src/scripts/derivePubkey.ts
+
+# Manually deposit USDC into Jupiter Lend Earn (--dry-run simulates first)
 pnpm --filter @reflux/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dry-run
 
-# discover live "Up or Down" markets for an asset
+# Discover live "Up or Down" markets for an asset
 pnpm --filter @reflux/orchestrator exec tsx src/scripts/findMarket.ts Bitcoin
 
-# open a NO-contract hedge on a specific market (--dry-run simulates)
+# Open a NO-contract hedge on a specific market (--dry-run simulates first)
 pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts POLY-1345530 5 --dry-run
 ```
+
+### 4) Manual rebalance + claim during demos
+
+```bash
+# Dry-run: shows what the loop *would* do without affecting state
+curl http://localhost:4000/rebalance/preview | jq
+
+# Live rebalance (claims any resolved positions, places new hedges, compounds)
+curl -X POST http://localhost:4000/rebalance/trigger | jq
+
+# Claim sweep only — useful when a market just resolved
+curl -X POST http://localhost:4000/claim/sweep | jq
+```
+
+The rebalance cron runs daily at 00:00 UTC by default (`REBALANCE_CRON` env var); the manual endpoints exist for demos and testing.
+
+### Quality gates
+
+```bash
+pnpm typecheck      # all packages
+pnpm test           # vitest suites: shared (microUsd, bps), orchestrator (accountant, basket)
+pnpm --filter @reflux/web run build   # production Next.js build
+```
+
+All green at the time of the final commit.
 
 ---
 
 ## DX report
 
-This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**. We maintain a running DX log in [`docs/dx-log/`](./docs/dx-log/) — every friction point captured in real time, with timestamps, the specific endpoint or SDK call, and a concrete suggested fix.
+This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**.
 
-The orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page in the frontend renders it as a transparency surface judges can verify in real time.
+- The full report lives at [`DX-REPORT.md`](./DX-REPORT.md) — 25 concrete findings, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
+- The running raw log is in [`docs/dx-log/`](./docs/dx-log/), captured in real time during development.
+- The orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page renders it as a transparency surface judges can verify in real time.
 
-At submission, the running log is consolidated into a single `DX-REPORT.md`.
+The 90-second demo script is at [`docs/demo-script.md`](./docs/demo-script.md).

@@ -1,4 +1,4 @@
-# Reflux — Product Spec (v1)
+# Ballast — Product Spec (v1)
 
 **Status:** v1 scope locked
 **Captured:** 2026-04-30
@@ -7,9 +7,9 @@
 
 ## Product summary
 
-Reflux is a yield-bearing USDC vault for Solana DeFi users who want passive yield with built-in tail-risk hedging. Depositors earn Jupiter Lend Earn yield on their USDC. The vault automatically uses a portion of that yield to buy NO contracts on tail-risk prediction markets — events that, if they happen, would correlate with bad outcomes for crypto holders. If a hedged event resolves NO (i.e. the bad thing doesn't happen), depositors keep the residual yield. If it resolves YES (bad thing happens), the payout sweeps back to depositors.
+Ballast is a yield-bearing USDC vault for Solana DeFi users who want passive yield with built-in tail-risk hedging. Depositors earn Jupiter Lend Earn yield on their USDC. The vault automatically uses a portion of that yield to buy NO contracts on tail-risk prediction markets — events that, if they happen, would correlate with bad outcomes for crypto holders. If a hedged event resolves NO (i.e. the bad thing doesn't happen), depositors keep the residual yield. If it resolves YES (bad thing happens), the payout sweeps back to depositors.
 
-**Reflux is a soft hedge, not full insurance.** It offsets some downside while principal still earns yield. It is explicitly framed as "tail-risk-hedged yield" not as an insurance product (regulatory caution).
+**Ballast is a soft hedge, not full insurance.** It offsets some downside while principal still earns yield. It is explicitly framed as "tail-risk-hedged yield" not as an insurance product (regulatory caution).
 
 ---
 

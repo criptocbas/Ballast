@@ -1,4 +1,4 @@
-# Reflux — Architecture
+# Ballast — Architecture
 
 **Status:** v1 design (draft)
 **Captured:** 2026-04-30
@@ -15,7 +15,7 @@
 
 ```
                   ┌──────────────────────────────────────────────────┐
-                  │                    REFLUX                        │
+                  │                    BALLAST                       │
                   ├──────────────────────────────────────────────────┤
                   │                                                  │
    USER ─wallet──▶│  apps/web (Next.js)                              │
@@ -60,10 +60,10 @@
 
 ## Custody model (v1: transparent custodial)
 
-For the hackathon scope, Reflux v1 is **explicitly custodial**:
+For the hackathon scope, Ballast v1 is **explicitly custodial**:
 - A single Solana keypair (the "vault keypair") holds all deposits and Jupiter positions.
 - The keypair is owned by the orchestrator (private key in env var, server-side only).
-- Depositors trust Reflux to honor the share accounting and withdrawal flow.
+- Depositors trust Ballast to honor the share accounting and withdrawal flow.
 
 **Why custodial v1:**
 - Eliminates the smart-contract risk surface (we'd need an audited vault program for trustless v1)
@@ -188,7 +188,7 @@ reflux/
 
 ## API integration depth (the 25% category)
 
-| API | Endpoints used | Purpose in Reflux |
+| API | Endpoints used | Purpose in Ballast |
 |---|---|---|
 | **Lend Earn** | `/lend/v1/earn/tokens`, `/lend/v1/earn/deposit`, `/lend/v1/earn/withdraw`, `/lend/v1/earn/positions`, `/lend/v1/earn/earnings` | Deposit asset float, position reading, yield extraction |
 | **Prediction** | `/prediction/v1/events`, `/prediction/v1/markets/{id}`, `/prediction/v1/orderbook/{id}`, `/prediction/v1/orders` (POST), `/prediction/v1/positions`, `/prediction/v1/positions/{id}/claim` | Tail-risk market discovery, hedge order placement, payout claims |

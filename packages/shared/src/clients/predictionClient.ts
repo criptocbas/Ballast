@@ -1,4 +1,6 @@
 import type {
+  ClaimPositionRequest,
+  ClaimPositionResponse,
   ClosePositionRequest,
   ClosePositionResponse,
   CreateOrderRequest,
@@ -95,6 +97,17 @@ export class PredictionClient {
   ): Promise<ClosePositionResponse> {
     return this.http.delete<ClosePositionResponse>(
       `/prediction/v1/positions/${encodeURIComponent(positionPubkey)}`,
+      body,
+    );
+  }
+
+  /** POST /prediction/v1/positions/{positionPubkey}/claim — returns a base64 tx that claims the payout. */
+  async claimPosition(
+    positionPubkey: string,
+    body: ClaimPositionRequest,
+  ): Promise<ClaimPositionResponse> {
+    return this.http.post<ClaimPositionResponse>(
+      `/prediction/v1/positions/${encodeURIComponent(positionPubkey)}/claim`,
       body,
     );
   }

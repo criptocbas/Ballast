@@ -15,6 +15,7 @@ import {
   runRebalanceTick,
   scheduleRebalanceCron,
 } from './rebalance.js';
+import { claimPosition, runClaimSweep } from './claimer.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -144,6 +145,24 @@ server.get('/rebalance/preview', async () => {
   // Dry-run with cooldown disabled so callers can preview without affecting state.
   return runRebalanceTick({ dryRun: true, minIntervalMs: 0 });
 });
+
+server.post('/claim/sweep', async () => {
+  return runClaimSweep();
+});
+
+server.post<{ Params: { positionPubkey: string } }>(
+  '/claim/:positionPubkey',
+  async (req, reply) => {
+    try {
+      return await claimPosition(req.params.positionPubkey);
+    } catch (err) {
+      return reply.code(400).send({
+        error: 'claim_failed',
+        message: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+  },
+);
 
 server.get('/vault/hedges', async () => {
   const rows = listPersistedHedges(100);

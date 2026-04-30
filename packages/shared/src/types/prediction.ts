@@ -188,9 +188,13 @@ export interface PredictionPosition {
   pnlUsdPercent: number;
   pnlUsdAfterFees: string;
   pnlUsdAfterFeesPercent: number;
-  /** Whether the position is settled and claimable. */
+  /** Whether the market resolved in this position's favor and a payout is available. */
+  claimable?: boolean;
+  /** Whether the payout has already been claimed (or auto-claimed by the keeper after 24h). */
   claimed: boolean;
   claimedUsd: string;
+  /** Available payout in micro-USD when claimable. */
+  payoutUsd?: string;
   openOrders: number;
   openedAt: number;
   updatedAt: number;
@@ -224,5 +228,28 @@ export interface ClosePositionResponse {
   txMeta: {
     blockhash: string;
     lastValidBlockHeight: number;
+  };
+}
+
+export interface ClaimPositionRequest {
+  ownerPubkey: string;
+}
+
+/**
+ * `POST /positions/{positionPubkey}/claim` response.
+ *
+ * DX-LOG-REF: Gap #25 — the claim response uses top-level `blockhash` /
+ * `lastValidBlockHeight` instead of the `txMeta` envelope used by /orders and
+ * /positions/{id} (DELETE). Inconsistent shape across closely-related write
+ * endpoints in the same product.
+ */
+export interface ClaimPositionResponse {
+  transaction: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+  position: {
+    pubkey: string;
+    contracts: string;
+    payoutAmountUsd: string;
   };
 }

@@ -12,6 +12,7 @@ import { readUsdcEarnPosition, depositUsdcToLendEarn, USDC_MINT } from './lend.j
 import { getJupiterClients } from './jupiter.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
 import { openHedgeOrder, listVaultPositions } from './prediction.js';
+import { runClaimSweep } from './claimer.js';
 
 /**
  * Ballast rebalance loop.
@@ -135,6 +136,22 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
 
   const cfg = loadConfig();
   const basket = loadBasket();
+
+  // 0) Sweep any claimable resolved positions BEFORE we look at the wallet —
+  //    payouts arrive as USDC and become part of the available budget.
+  if (!options.dryRun) {
+    try {
+      const sweep = await runClaimSweep();
+      if (sweep.claimed.length > 0) {
+        log.info(
+          { claimed: sweep.claimed.length, totalPayout: sweep.claimed.reduce((s, c) => s + c.payoutUsd, 0) },
+          'Pre-rebalance claim sweep',
+        );
+      }
+    } catch (err) {
+      log.warn({ err }, 'Pre-rebalance claim sweep failed (non-fatal)');
+    }
+  }
 
   // 1) Snapshot live state
   const wallet = getVaultWallet();

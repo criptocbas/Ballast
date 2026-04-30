@@ -83,24 +83,52 @@ pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts POLY-134553
 
 ### 4) Manual rebalance + claim during demos
 
+Mutating endpoints are gated behind `Authorization: Bearer $ORCHESTRATOR_ADMIN_TOKEN`. Set the token in `.env` (`openssl rand -hex 32`), then:
+
 ```bash
-# Dry-run: shows what the loop *would* do without affecting state
+TOKEN=$(grep ORCHESTRATOR_ADMIN_TOKEN .env | cut -d= -f2)
+
+# Dry-run: shows what the loop *would* do (public, unauthenticated)
 curl http://localhost:4000/rebalance/preview | jq
 
-# Live rebalance (claims any resolved positions, places new hedges, compounds)
-curl -X POST http://localhost:4000/rebalance/trigger | jq
+# Live rebalance — withdraws yield from Lend, places hedges, compounds, settles withdrawals
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:4000/admin/rebalance/trigger | jq
 
-# Claim sweep only — useful when a market just resolved
-curl -X POST http://localhost:4000/claim/sweep | jq
+# Claim sweep — claims resolved positions and distributes pro-rata to depositors
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:4000/admin/claim/sweep | jq
+
+# Process queued depositor withdrawals
+curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:4000/admin/withdrawals/process | jq
+
+# Full depositor list (admin)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:4000/admin/depositors | jq
 ```
 
-The rebalance cron runs daily at 00:00 UTC by default (`REBALANCE_CRON` env var); the manual endpoints exist for demos and testing.
+The rebalance cron runs daily at 00:00 UTC by default (`REBALANCE_CRON` env var); the admin endpoints exist for demos and operations.
+
+### Public endpoints (no auth)
+
+```
+GET  /health                   liveness
+GET  /vault/info               vault address, Lend position, hedges, TVL
+GET  /vault/aggregate          depositor count + total contributed (no PII)
+GET  /vault/hedges             persisted hedge history
+GET  /lend/tokens              Jupiter Lend Earn rates snapshot
+GET  /prediction/events?...    pass-through to Jupiter Prediction events
+GET  /dx/observations          live Jupiter API call log
+GET  /api/me/:wallet           depositor view (share %, contributions, payouts)
+GET  /rebalance/preview        dry-run rebalance with cooldown disabled
+POST /api/auth/nonce           issue a sign-message nonce
+POST /api/deposits/confirm     verify on-chain deposit + signed proof
+POST /api/withdrawals/request  signed withdrawal (settles inline if possible)
+```
 
 ### Quality gates
 
 ```bash
 pnpm typecheck      # all packages
-pnpm test           # vitest suites: shared (microUsd, bps), orchestrator (accountant, basket)
+pnpm test           # vitest: 25 tests across shared (units), accountant (shares + distribution),
+                    # nonces (sign-message + replay), basket-config validation
 pnpm --filter @reflux/web run build   # production Next.js build
 ```
 
@@ -112,7 +140,7 @@ All green at the time of the final commit.
 
 This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**.
 
-- The full report lives at [`DX-REPORT.md`](./DX-REPORT.md) — 25 concrete findings, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
+- The full report lives at [`DX-REPORT.md`](./DX-REPORT.md) — 27 concrete findings, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
 - The running raw log is in [`docs/dx-log/`](./docs/dx-log/), captured in real time during development.
 - The orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page renders it as a transparency surface judges can verify in real time.
 

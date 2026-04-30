@@ -5,6 +5,7 @@ import { getJupiterClients } from './jupiter.js';
 import { readRecentObservations } from './eventLog.js';
 import { bpsToPercentString, microToUsd } from '@reflux/shared';
 import { getVaultSolBalance, getVaultWallet } from './wallet.js';
+import { readUsdcEarnPosition } from './lend.js';
 
 /**
  * Reflux Orchestrator — entrypoint.
@@ -24,13 +25,25 @@ server.get('/health', async () => ({ status: 'ok', cluster: cfg.SOLANA_CLUSTER }
 
 server.get('/vault/info', async () => {
   const wallet = getVaultWallet();
-  const sol = await getVaultSolBalance();
+  const [sol, lendPosition] = await Promise.all([
+    getVaultSolBalance(),
+    readUsdcEarnPosition().catch(() => null),
+  ]);
   return {
     address: wallet.pubkeyBase58,
     cluster: cfg.SOLANA_CLUSTER,
     solBalance: sol.sol,
     solBalanceLamports: sol.lamports,
     solscanUrl: `https://solscan.io/account/${wallet.pubkeyBase58}`,
+    lendPosition: lendPosition
+      ? {
+          jlTokenSymbol: 'jlUSDC',
+          underlyingSymbol: 'USDC',
+          underlyingUsdc: lendPosition.underlyingUsdc,
+          jlTokenBalanceBaseUnits: lendPosition.jlTokenBalanceBaseUnits,
+          totalApyBps: lendPosition.totalApyBps,
+        }
+      : null,
   };
 });
 

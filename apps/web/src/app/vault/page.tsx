@@ -50,16 +50,60 @@ export default async function VaultPage() {
       )}
 
       {vault && (
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Stat label="Vault address" value={shortAddress(vault.address)} mono small />
-          <Stat label="Cluster" value={vault.cluster} mono />
-          <Stat
-            label="SOL for gas"
-            value={`${vault.solBalance.toFixed(4)} SOL`}
-            mono
-            tone={vault.solBalance > 0.01 ? 'positive' : 'warn'}
-          />
-        </div>
+        <>
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Stat label="Vault address" value={shortAddress(vault.address)} mono small />
+            <Stat label="Cluster" value={vault.cluster} mono />
+            <Stat
+              label="SOL for gas"
+              value={`${vault.solBalance.toFixed(4)} SOL`}
+              mono
+              tone={vault.solBalance > 0.01 ? 'positive' : 'warn'}
+            />
+          </div>
+
+          {vault.lendPosition && (
+            <section className="mt-10 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">
+                    Lend Earn position
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-3">
+                    <span className="font-mono tabular-nums text-3xl font-semibold text-fg">
+                      ${vault.lendPosition.underlyingUsdc.toFixed(4)}
+                    </span>
+                    <span className="text-sm text-[var(--fg-dim)]">
+                      held in {vault.lendPosition.jlTokenSymbol}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">
+                    APY
+                  </div>
+                  <div className="mt-2 font-mono tabular-nums text-2xl font-semibold text-emerald-400">
+                    {(vault.lendPosition.totalApyBps / 100).toFixed(2)}%
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border)] pt-4 text-xs text-[var(--fg-dim)]">
+                <span>
+                  jlUSDC base units:{' '}
+                  <span className="font-mono text-fg">
+                    {vault.lendPosition.jlTokenBalanceBaseUnits}
+                  </span>
+                </span>
+                <span>
+                  Underlying:{' '}
+                  <span className="font-mono text-fg">
+                    {vault.lendPosition.underlyingSymbol}
+                  </span>
+                </span>
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {lend && (

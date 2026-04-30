@@ -23,12 +23,21 @@ async function get<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface LendPositionSummary {
+  jlTokenSymbol: string;
+  underlyingSymbol: string;
+  underlyingUsdc: number;
+  jlTokenBalanceBaseUnits: string;
+  totalApyBps: number;
+}
+
 export interface VaultInfo {
   address: string;
   cluster: string;
   solBalance: number;
   solBalanceLamports: number;
   solscanUrl: string;
+  lendPosition: LendPositionSummary | null;
 }
 
 export interface LendTokenSummary {

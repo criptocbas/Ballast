@@ -36,6 +36,7 @@ import {
   requestWithdrawal,
   WithdrawalError,
 } from './withdrawals.js';
+import { runDepositWatcher } from './depositWatcher.js';
 
 /**
  * Ballast Orchestrator — entrypoint.
@@ -413,6 +414,18 @@ server.post<{ Body: { dryRun?: boolean; skipCompound?: boolean } | undefined }>(
 
 server.post('/admin/claim/sweep', { preHandler: requireAdmin }, async () => runClaimSweep());
 
+server.post<{ Body: { limit?: number; dryRun?: boolean } | undefined }>(
+  '/admin/deposits/watcher',
+  { preHandler: requireAdmin },
+  async (req) => {
+    const body = (req.body ?? {}) as { limit?: number; dryRun?: boolean };
+    const opts: Parameters<typeof runDepositWatcher>[0] = {};
+    if (typeof body.limit === 'number') opts.limit = body.limit;
+    if (typeof body.dryRun === 'boolean') opts.dryRun = body.dryRun;
+    return runDepositWatcher(opts);
+  },
+);
+
 server.post<{ Params: { positionPubkey: string } }>(
   '/admin/claim/:positionPubkey',
   { preHandler: requireAdmin },
@@ -478,6 +491,26 @@ async function main(): Promise<void> {
   scheduleRebalanceCron();
   await server.listen({ port: cfg.ORCHESTRATOR_PORT, host: '0.0.0.0' });
   log.info({ port: cfg.ORCHESTRATOR_PORT }, 'Ballast orchestrator listening');
+
+  // One-shot recovery on boot: catch up on deposits we missed while offline.
+  // Non-blocking — listening doesn't need to wait on this.
+  void runDepositWatcher({ limit: 100 })
+    .then((result) => {
+      if (result.recovered.length > 0) {
+        log.info(
+          {
+            recovered: result.recovered.length,
+            totalUsdc: result.recovered.reduce((s, r) => s + r.amountUsdc, 0),
+          },
+          'Boot deposit recovery: caught up on missed inbound deposits',
+        );
+      } else {
+        log.info({ scanned: result.scanned }, 'Boot deposit recovery: nothing to recover');
+      }
+    })
+    .catch((err: unknown) => {
+      log.warn({ err }, 'Boot deposit recovery failed (non-fatal)');
+    });
 }
 
 main().catch((err: unknown) => {

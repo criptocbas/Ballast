@@ -70,7 +70,39 @@ const server = Fastify({ loggerInstance: log });
 
 server.get('/health', async () => ({ status: 'ok', cluster: cfg.SOLANA_CLUSTER }));
 
+/**
+ * 15-second TTL cache for /vault/info — the underlying calls (Helius getBalance,
+ * Jupiter Lend SDK, Jupiter Prediction REST) take 3-15s combined and the result
+ * doesn't change second-to-second. Without this, every page render burns ~10s
+ * of latency and creates the "constant compiling" feel.
+ *
+ * In-flight dedup: parallel callers awaiting the same fetch share one promise.
+ */
+let vaultInfoCache: { value: unknown; at: number } | null = null;
+let vaultInfoInFlight: Promise<unknown> | null = null;
+const VAULT_INFO_TTL_MS = 15_000;
+
 server.get('/vault/info', async () => {
+  const now = Date.now();
+  if (vaultInfoCache && now - vaultInfoCache.at < VAULT_INFO_TTL_MS) {
+    return vaultInfoCache.value;
+  }
+  if (vaultInfoInFlight) {
+    return vaultInfoInFlight;
+  }
+  vaultInfoInFlight = (async () => {
+    try {
+      const result = await fetchVaultInfoUncached();
+      vaultInfoCache = { value: result, at: Date.now() };
+      return result;
+    } finally {
+      vaultInfoInFlight = null;
+    }
+  })();
+  return vaultInfoInFlight;
+});
+
+async function fetchVaultInfoUncached(): Promise<unknown> {
   const wallet = getVaultWallet();
   const [sol, lendPosition, hedgePositionsResponse] = await Promise.all([
     getVaultSolBalance(),
@@ -112,7 +144,7 @@ server.get('/vault/info', async () => {
       : null,
     hedges,
   };
-});
+}
 
 /** Anonymous aggregates — replaces the public depositor list (privacy fix). */
 server.get('/vault/aggregate', async () => {

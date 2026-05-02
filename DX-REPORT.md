@@ -258,6 +258,8 @@ Related to #16 but worth its own number: even after we figured out that `underly
 
 ## AI Stack — what worked, what didn't, what's missing
 
+> **Detailed companion document:** [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md) is the primary deliverable for the bounty's 25% AI-stack feedback weight. It covers each of the four components (Skills × 2, CLI, MCP, llms.txt) with structured per-tool analysis, scores, and prioritized recommendations. The summary below is an executive recap; the FEEDBACK.md is where the depth lives.
+
 We used all four pieces of Jupiter's AI stack during the build:
 
 ### Skills (`integrating-jupiter`, `jupiter-lend`)

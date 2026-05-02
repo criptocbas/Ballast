@@ -136,12 +136,13 @@ All green at the time of the final commit.
 
 ---
 
-## DX report
+## Bounty deliverables
 
-This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**.
+This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**. We treat them as separate documents:
 
-- The full report lives at [`DX-REPORT.md`](./DX-REPORT.md) — 27 concrete findings, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
-- The running raw log is in [`docs/dx-log/`](./docs/dx-log/), captured in real time during development.
-- The orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page renders it as a transparency surface judges can verify in real time.
+- **DX report (35%)** — [`DX-REPORT.md`](./DX-REPORT.md). 27 concrete findings on the Jupiter APIs / SDKs we touched, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
+- **AI Stack feedback (25%)** — [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md). Per-tool analysis (Skills × 2, CLI, MCP, llms.txt) with what worked, what misled, file:line receipts, scores, and a top-5 prioritized recommendation list.
+- **Running raw log** — [`docs/dx-log/`](./docs/dx-log/), captured in real time during development. The DX report and AI feedback both crystallize from this.
+- **Live transparency surface** — the orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page renders it.
 
 The 90-second demo script is at [`docs/demo-script.md`](./docs/demo-script.md).

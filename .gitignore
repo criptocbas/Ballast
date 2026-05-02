@@ -49,3 +49,7 @@ coverage/
 .cache/
 .turbo/
 .eslintcache
+
+# Skills CLI cache (skill content is restorable via `npx skills experimental_install` from skills-lock.json)
+.agents/
+.junie/

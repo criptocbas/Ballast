@@ -23,6 +23,9 @@ importers:
 
   apps/orchestrator:
     dependencies:
+      '@ballast/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@fastify/cors':
         specifier: ^11.2.0
         version: 11.2.0
@@ -32,9 +35,6 @@ importers:
       '@jup-ag/lend-read':
         specifier: ^0.0.12
         version: 0.0.12(@metaplex-foundation/umi@1.5.1)(@types/node@22.19.17)(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(node-fetch@2.7.0)(typescript@5.9.3)(utf-8-validate@6.0.6)(vite@7.3.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.3))(ws@8.20.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
-      '@reflux/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@solana/spl-token':
         specifier: ^0.4.14
         version: 0.4.14(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.1.0)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@6.0.6)
@@ -108,7 +108,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@reflux/shared':
+      '@ballast/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@solana/spl-token':

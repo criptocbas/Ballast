@@ -1,7 +1,7 @@
 /**
  * One-off utility: prints the vault public key from .env.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/derivePubkey.ts
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/derivePubkey.ts
  */
 import { getVaultWallet } from '../wallet.js';
 

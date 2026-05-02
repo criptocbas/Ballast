@@ -71,7 +71,7 @@ export interface DepositWatcherOptions {
 }
 
 interface ParsedSplTransfer {
-  programId: string;
+  programId: string | { toBase58: () => string };
   parsed: {
     type: 'transfer' | 'transferChecked';
     info: {

@@ -43,6 +43,54 @@ export default function HomePage() {
       </section>
 
       <section className="border-b border-[var(--border)]">
+        <div className="mx-auto w-full max-w-6xl px-6 py-20 sm:py-24">
+          <div className="grid gap-10 sm:grid-cols-[1fr_1.2fr] sm:gap-14">
+            <div className="sm:pr-4">
+              <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--accent-bright)]">
+                The composition
+              </span>
+              <h2 className="mt-4 text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
+                Yield is the premium. Prediction is the underwriter.
+              </h2>
+              <p className="mt-5 text-[15px] leading-relaxed text-[var(--fg-dim)]">
+                Jupiter built Prediction as a speculation product and Lend as a yield product. Ballast
+                treats them as the underwriting layer and the premium engine of an insurance vault —
+                a composition the Jupiter SDKs don&apos;t directly support, but the public APIs make
+                possible.
+              </p>
+              <p className="mt-4 text-[15px] leading-relaxed text-[var(--fg-dim)]">
+                Depositors never directly pay a premium. The vault self-insures with native
+                primitives.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-7 font-mono text-[13.5px] leading-relaxed text-[var(--fg-dim)] sm:text-sm">
+              <div className="text-[var(--fg-muted)]"># A rebalance tick, schematically</div>
+              <div className="mt-4">
+                yield <span className="text-[var(--accent)]">←</span> Lend.withdrawAccrued(
+                <span className="text-[var(--positive)]">vault</span>)
+              </div>
+              <div>
+                hedges <span className="text-[var(--accent)]">←</span>{' '}
+                Prediction.openNo(curatedBasket, yield × 0.5)
+              </div>
+              <div>
+                compounded <span className="text-[var(--accent)]">←</span> Lend.deposit(
+                <span className="text-[var(--positive)]">vault</span>, yield × 0.5)
+              </div>
+              <div className="mt-4">
+                payouts <span className="text-[var(--accent)]">←</span>{' '}
+                Prediction.claimResolved(hedges)
+              </div>
+              <div>
+                shares <span className="text-[var(--accent)]">←</span>{' '}
+                Vault.distribute(payouts ⊕ compounded)
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-px bg-[var(--border)] sm:grid-cols-3">
           <Step
             num="01"
@@ -59,49 +107,6 @@ export default function HomePage() {
             title="Payouts sweep back"
             body="If a hedged event resolves YES (i.e. the bad thing happens), the prediction-market payout returns to the vault and is distributed pro-rata to depositors."
           />
-        </div>
-      </section>
-
-      <section className="mx-auto w-full max-w-6xl px-6 py-20">
-        <div className="grid gap-10 sm:grid-cols-[1.1fr_1fr] sm:gap-16">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
-              The flip that makes this work
-            </h2>
-            <p className="mt-5 text-[15px] leading-relaxed text-[var(--fg-dim)]">
-              Jupiter built Prediction as a speculation product and Lend as a yield product. Ballast
-              treats them as the underwriting layer and the premium engine of an insurance vault —
-              a composition the Jupiter SDKs don&apos;t directly support, but the public APIs make
-              possible.
-            </p>
-            <p className="mt-4 text-[15px] leading-relaxed text-[var(--fg-dim)]">
-              Depositors never directly pay a premium. The vault self-insures with native
-              primitives.
-            </p>
-          </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-6 font-mono text-[13px] leading-relaxed text-[var(--fg-dim)]">
-            <div className="text-[var(--fg-muted)]"># A rebalance tick, schematically</div>
-            <div className="mt-3">
-              yield <span className="text-[var(--accent)]">←</span> Lend.withdrawAccrued(
-              <span className="text-[var(--positive)]">vault</span>)
-            </div>
-            <div>
-              hedges <span className="text-[var(--accent)]">←</span>{' '}
-              Prediction.openNo(curatedBasket, yield × 0.5)
-            </div>
-            <div>
-              compounded <span className="text-[var(--accent)]">←</span> Lend.deposit(
-              <span className="text-[var(--positive)]">vault</span>, yield × 0.5)
-            </div>
-            <div className="mt-3">
-              payouts <span className="text-[var(--accent)]">←</span>{' '}
-              Prediction.claimResolved(hedges)
-            </div>
-            <div>
-              shares <span className="text-[var(--accent)]">←</span>{' '}
-              Vault.distribute(payouts ⊕ compounded)
-            </div>
-          </div>
         </div>
       </section>
     </div>

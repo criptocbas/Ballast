@@ -4,7 +4,7 @@ import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { getJupiterClients } from './jupiter.js';
 import { readRecentObservations } from './eventLog.js';
-import { bpsToPercentString, microToUsd } from '@reflux/shared';
+import { bpsToPercentString, microToUsd } from '@ballast/shared';
 import { getVaultSolBalance, getVaultWallet } from './wallet.js';
 import { readUsdcEarnPosition } from './lend.js';
 import { listVaultPositions } from './prediction.js';

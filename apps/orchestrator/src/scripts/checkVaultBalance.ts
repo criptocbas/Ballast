@@ -1,7 +1,7 @@
 /**
  * Diagnostic: prints SOL + token balances for the vault wallet.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/checkVaultBalance.ts
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/checkVaultBalance.ts
  */
 import { PublicKey } from '@solana/web3.js';
 import { getSolanaConnection, getVaultWallet } from '../wallet.js';

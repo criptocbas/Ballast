@@ -1,11 +1,11 @@
 /**
  * Deposit USDC from the vault into Jupiter Lend Earn.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/depositToLend.ts <amount> [--dry-run]
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/depositToLend.ts <amount> [--dry-run]
  *
  * Examples:
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dry-run
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/depositToLend.ts 1
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dry-run
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/depositToLend.ts 1
  */
 import { depositUsdcToLendEarn, readUsdcEarnPosition } from '../lend.js';
 import { getVaultWallet } from '../wallet.js';

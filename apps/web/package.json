@@ -1,5 +1,5 @@
 {
-  "name": "@reflux/web",
+  "name": "@ballast/web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -9,11 +9,11 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests"
   },
   "dependencies": {
-    "@reflux/shared": "workspace:*",
+    "@ballast/shared": "workspace:*",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",

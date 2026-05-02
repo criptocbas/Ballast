@@ -1,14 +1,14 @@
 /**
  * Open a NO-contract hedge order on a Jupiter Prediction market.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts <marketId> <usdc> [--side=yes|no] [--dry-run]
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts <marketId> <usdc> [--side=yes|no] [--dry-run]
  *
  * Examples:
  *   # Simulate buying $0.50 of NO contracts on a market
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts POLY-2114146-0 0.5 --dry-run
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts POLY-2114146-0 0.5 --dry-run
  *
  *   # Live: buy $0.50 of NO contracts (default side)
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts POLY-2114146-0 0.5
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts POLY-2114146-0 0.5
  */
 import { openHedgeOrder, waitForOrderFill } from '../prediction.js';
 import { getJupiterClients } from '../jupiter.js';

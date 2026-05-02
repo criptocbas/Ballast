@@ -1,6 +1,6 @@
-import { JupiterHttpClient, LendEarnClient, PredictionClient } from '@reflux/shared';
+import { JupiterHttpClient, LendEarnClient, PredictionClient } from '@ballast/shared';
 import { loadConfig } from './config.js';
-import type { ApiObservation } from '@reflux/shared';
+import type { ApiObservation } from '@ballast/shared';
 import { recordObservation } from './eventLog.js';
 
 /**

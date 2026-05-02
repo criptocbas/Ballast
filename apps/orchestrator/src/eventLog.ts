@@ -1,4 +1,4 @@
-import type { ApiObservation } from '@reflux/shared';
+import type { ApiObservation } from '@ballast/shared';
 import { desc } from 'drizzle-orm';
 import { observations } from './db/schema.js';
 import { getDb } from './db/index.js';

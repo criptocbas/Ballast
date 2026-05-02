@@ -10,7 +10,7 @@ let tmp: string;
 
 beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), 'ballast-nonces-'));
-  process.env.DATABASE_URL = `file:${join(tmp, 'reflux.sqlite')}`;
+  process.env.DATABASE_URL = `file:${join(tmp, 'ballast.sqlite')}`;
 });
 
 beforeEach(async () => {

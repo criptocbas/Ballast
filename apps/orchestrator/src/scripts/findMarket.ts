@@ -2,7 +2,7 @@
  * Find a candidate market for a quick on-chain hedge test. Prints the next-to-resolve
  * 5-minute "Up or Down" market on a chosen asset.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx src/scripts/findMarket.ts [asset]
+ *   pnpm --filter @ballast/orchestrator exec tsx src/scripts/findMarket.ts [asset]
  *
  * `asset` defaults to "Bitcoin". Try "Solana", "Ethereum", "XRP".
  */

@@ -3,7 +3,7 @@
  * existing transaction. Useful when the orchestrator was unreachable at the
  * moment of deposit (e.g. mid-restart) but the SPL transfer landed on chain.
  *
- *   pnpm --filter @reflux/orchestrator exec tsx \
+ *   pnpm --filter @ballast/orchestrator exec tsx \
  *     src/scripts/recordDeposit.ts <signature> <depositor> <amount>
  */
 import { recordDeposit } from '../accountant.js';

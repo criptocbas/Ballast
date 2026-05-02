@@ -36,7 +36,7 @@ const ConfigSchema = z.object({
   SOLANA_RPC_URL: z.string().url().optional(),
   SOLANA_CLUSTER: z.enum(['mainnet-beta', 'devnet']).default('mainnet-beta'),
   VAULT_KEYPAIR_BASE58: z.string().min(1).optional(),
-  DATABASE_URL: z.string().default('file:./reflux.sqlite'),
+  DATABASE_URL: z.string().default('file:./ballast.sqlite'),
   ORCHESTRATOR_PORT: z.coerce.number().int().positive().default(4000),
   REBALANCE_CRON: z.string().default('0 0 * * *'),
   HEDGE_BUDGET_FRACTION: z.coerce.number().min(0).max(1).default(0.5),

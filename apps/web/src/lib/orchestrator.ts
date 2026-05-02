@@ -7,7 +7,7 @@
  * NOTE: every page that consumes these uses `revalidate = 0` (or `cache: 'no-store'`)
  * because we want live data — judges should see real-time numbers when reviewing.
  */
-import type { ApiObservation } from '@reflux/shared';
+import type { ApiObservation } from '@ballast/shared';
 
 const ORCHESTRATOR_URL =
   process.env.ORCHESTRATOR_URL ??

@@ -42,8 +42,8 @@ export default async function VaultPage() {
 
       {error && (
         <div className="mt-8 rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-sm text-rose-400">
-          Couldn&apos;t reach the orchestrator. Make sure it&apos;s running:{' '}
-          <code className="font-mono text-rose-200">pnpm dev:orchestrator</code>
+          Couldn&apos;t reach the orchestrator. Vault state will refresh automatically when the
+          backend is back online.
           <br />
           <span className="text-rose-300/80">Detail: {error}</span>
         </div>
@@ -51,15 +51,25 @@ export default async function VaultPage() {
 
       {vault && (
         <>
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Stat label="Vault address" value={shortAddress(vault.address)} mono small />
-            <Stat label="Cluster" value={vault.cluster} mono />
-            <Stat
-              label="SOL for gas"
-              value={`${vault.solBalance.toFixed(4)} SOL`}
-              mono
-              tone={vault.solBalance > 0.01 ? 'positive' : 'warn'}
-            />
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-b border-[var(--border)] py-3 text-[13px]">
+            <span className="flex items-center gap-2">
+              <span className="text-[var(--fg-muted)]">Address</span>
+              <span className="font-mono tabular-nums text-fg">{shortAddress(vault.address)}</span>
+            </span>
+            <span className="text-[var(--fg-muted)]">·</span>
+            <span className="flex items-center gap-2">
+              <span className="text-[var(--fg-muted)]">Cluster</span>
+              <span className="font-mono text-fg">{vault.cluster}</span>
+            </span>
+            <span className="text-[var(--fg-muted)]">·</span>
+            <span className="flex items-center gap-2">
+              <span className="text-[var(--fg-muted)]">SOL gas</span>
+              <span
+                className={`font-mono tabular-nums ${vault.solBalance > 0.01 ? 'text-emerald-400' : 'text-amber-400'}`}
+              >
+                {vault.solBalance.toFixed(4)}
+              </span>
+            </span>
           </div>
 
           {vault.lendPosition && (
@@ -162,9 +172,9 @@ export default async function VaultPage() {
         </div>
         {vault && vault.hedges.length === 0 ? (
           <div className="mt-5 rounded-xl border border-dashed border-[var(--border)] p-12 text-center">
-            <p className="font-mono text-sm text-[var(--fg-muted)]">
-              No open hedges yet. Run{' '}
-              <code className="text-fg">scripts/openHedge.ts</code> or wait for the rebalance loop.
+            <p className="text-sm text-[var(--fg-dim)]">
+              No open hedges yet. The rebalance loop opens NO-contract positions when accrued yield
+              clears the per-tick threshold.
             </p>
           </div>
         ) : null}
@@ -176,35 +186,6 @@ export default async function VaultPage() {
           </div>
         ) : null}
       </section>
-    </div>
-  );
-}
-
-interface StatProps {
-  label: string;
-  value: string;
-  mono?: boolean;
-  small?: boolean;
-  tone?: 'default' | 'positive' | 'warn' | 'danger';
-}
-
-function Stat({ label, value, mono = false, small = false, tone = 'default' }: StatProps) {
-  const toneClass =
-    tone === 'positive'
-      ? 'text-emerald-400'
-      : tone === 'warn'
-        ? 'text-amber-400'
-        : tone === 'danger'
-          ? 'text-rose-400'
-          : 'text-fg';
-  return (
-    <div className="card p-5">
-      <div className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">{label}</div>
-      <div
-        className={`mt-2 ${small ? 'text-base' : 'text-2xl'} font-medium ${toneClass} ${mono ? 'font-mono tabular-nums' : ''}`}
-      >
-        {value}
-      </div>
     </div>
   );
 }

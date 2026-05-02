@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 /**
  * Share-math tests. Each test runs against a fresh temp SQLite so they don't pollute
- * the dev orchestrator's reflux.sqlite.
+ * the dev orchestrator's ballast.sqlite.
  *
  * We point DATABASE_URL at an absolute file path before importing the modules under test
  * so getDb() picks it up.
@@ -15,7 +15,7 @@ let tmp: string;
 
 beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), 'ballast-test-'));
-  process.env.DATABASE_URL = `file:${join(tmp, 'reflux.sqlite')}`;
+  process.env.DATABASE_URL = `file:${join(tmp, 'ballast.sqlite')}`;
 });
 
 afterEach(() => {

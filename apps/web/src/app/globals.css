@@ -58,15 +58,13 @@ body {
   color: var(--fg);
 }
 
-/* Ballast hero glow — warm amber lighthouse-beacon spilling against deep navy. */
+/* Ballast hero glow — single warm amber lighthouse-beacon, no second light source. */
 .hero-glow {
-  background:
-    radial-gradient(
-      circle at 22% 0%,
-      rgba(217, 119, 6, 0.20),
-      transparent 50%
-    ),
-    radial-gradient(circle at 78% 18%, rgba(14, 165, 233, 0.06), transparent 45%);
+  background: radial-gradient(
+    circle at 22% 0%,
+    rgba(217, 119, 6, 0.22),
+    transparent 52%
+  );
 }
 
 .tabular-nums {

@@ -4,7 +4,7 @@ import type {
   CreateOrderResponse,
   ListPositionsResponse,
   OrderStatusResponse,
-} from '@reflux/shared';
+} from '@ballast/shared';
 import { getJupiterClients } from './jupiter.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
 import { USDC_MINT } from './lend.js';

@@ -10,7 +10,7 @@ import { loadConfig } from '../config.js';
 /**
  * SQLite + Drizzle wiring.
  *
- *  - Path resolved from DATABASE_URL (`file:./reflux.sqlite` by default).
+ *  - Path resolved from DATABASE_URL (`file:./ballast.sqlite` by default).
  *  - WAL mode for safe-ish concurrent reads while the rebalance loop writes.
  *  - Migrations live in `apps/orchestrator/drizzle/` and auto-run on first
  *    `getDb()` call. Idempotent — safe to call from any module that needs db.

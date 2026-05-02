@@ -1,5 +1,5 @@
 {
-  "name": "reflux",
+  "name": "ballast",
   "private": true,
   "version": "0.0.0",
   "description": "A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets.",
@@ -15,9 +15,9 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,md,json,yml,yaml}\" --ignore-path .gitignore",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
-    "dev:web": "pnpm --filter @reflux/web dev",
-    "dev:orchestrator": "pnpm --filter @reflux/orchestrator dev",
-    "build:shared": "pnpm --filter @reflux/shared build"
+    "dev:web": "pnpm --filter @ballast/web dev",
+    "dev:orchestrator": "pnpm --filter @ballast/orchestrator dev",
+    "build:shared": "pnpm --filter @ballast/shared build"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

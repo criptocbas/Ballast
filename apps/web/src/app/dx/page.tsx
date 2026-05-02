@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { ApiObservation } from '@reflux/shared';
+import type { ApiObservation } from '@ballast/shared';
 import { orchestrator } from '@/lib/orchestrator';
 import { StatusPill } from '@/components/StatusPill';
 
@@ -26,7 +26,7 @@ export default async function DxLogPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-12">
-      <StatusPill pulse={!error} variant={error ? 'danger' : 'default'}>
+      <StatusPill variant={error ? 'danger' : 'default'}>
         {error ? 'Orchestrator unreachable' : 'Live feed'}
       </StatusPill>
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">Developer Experience log</h1>
@@ -39,9 +39,8 @@ export default async function DxLogPage() {
 
       {error ? (
         <div className="mt-8 rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-sm text-rose-400">
-          Orchestrator unreachable. Run{' '}
-          <code className="font-mono text-rose-200">pnpm dev:orchestrator</code> to populate this
-          page.
+          Orchestrator unreachable. The live feed will resume as soon as the orchestrator is back
+          online.
           <br />
           <span className="text-rose-300/80">Detail: {error}</span>
         </div>

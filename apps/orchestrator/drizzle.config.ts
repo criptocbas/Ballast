@@ -9,6 +9,6 @@ export default {
   out: './drizzle',
   dialect: 'sqlite',
   dbCredentials: {
-    url: './reflux.sqlite',
+    url: './ballast.sqlite',
   },
 } satisfies Config;

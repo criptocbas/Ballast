@@ -79,8 +79,6 @@ export function MePageClient({ orchestratorUrl }: MePageClientProps) {
     );
   }
 
-  // Vault current value × my share % = my position value (rough approximation —
-  // proper accounting in v2 will use share tokens).
   const vaultTvl =
     (vault?.lendPosition?.underlyingUsdc ?? 0) +
     (vault?.hedges.reduce((s, h) => s + h.valueUsd, 0) ?? 0);
@@ -89,7 +87,7 @@ export function MePageClient({ orchestratorUrl }: MePageClientProps) {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <StatusPill pulse>You · live</StatusPill>
+        <StatusPill>Your position</StatusPill>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight">Your Ballast position</h1>
         <p className="mt-2 text-sm text-[var(--fg-dim)]">
           Wallet:{' '}
@@ -99,14 +97,25 @@ export function MePageClient({ orchestratorUrl }: MePageClientProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat
-          label="Share"
-          value={`${me.sharePct.toFixed(2)}%`}
-          tone={me.sharePct > 0 ? 'accent' : 'muted'}
-        />
+      <div className="card p-6">
+        <div className="text-xs uppercase tracking-wider text-[var(--fg-muted)]">
+          Position value
+        </div>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="font-mono tabular-nums text-4xl font-semibold text-fg">
+            ${positionValue.toFixed(2)}
+          </span>
+          <span className="text-sm text-[var(--fg-dim)]">
+            <span className="font-mono tabular-nums text-[var(--accent-bright)]">
+              {me.sharePct.toFixed(2)}%
+            </span>{' '}
+            of vault TVL
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
         <Stat label="Contributed" value={`$${me.contributedUsdc.toFixed(2)}`} />
-        <Stat label="Position value" value={`$${positionValue.toFixed(2)}`} />
         <Stat
           label="Payouts accrued"
           value={`$${me.payoutsAccruedUsdc.toFixed(4)}`}

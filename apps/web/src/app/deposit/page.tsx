@@ -32,7 +32,7 @@ export default async function DepositPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-16">
-      <StatusPill pulse>Live on Solana mainnet</StatusPill>
+      <StatusPill>Solana mainnet</StatusPill>
       <h1 className="mt-4 text-3xl font-semibold tracking-tight">Deposit</h1>
       <p className="mt-3 text-[var(--fg-dim)]">
         Deposit USDC into the Ballast vault. Funds flow into Jupiter Lend Earn on the next

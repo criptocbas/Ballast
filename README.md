@@ -1,16 +1,40 @@
 # Ballast
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Tests](https://img.shields.io/badge/tests-43%20passing-success)](#quality-gates)
+[![Solana](https://img.shields.io/badge/Solana-mainnet-9945FF)](https://solscan.io/account/B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7)
+[![Hackathon](https://img.shields.io/badge/Frontier_Hackathon-Jupiter_sidetrack-F59E0B)](https://superteam.fun/earn/hackathon/frontier)
+
 > A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets. The yield is the premium engine; the hedges are the ballast that keeps depositors stable when crypto markets storm.
+
+**Live demo:** _coming soon_ · **Mainnet vault:** [`B6Mt…2zsX`](https://solscan.io/account/B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7) · **Cluster:** mainnet-beta
 
 Built for the Solana Frontier Hackathon — Jupiter *"Not Your Regular Bounty"* sidetrack.
 
-> **Note on the name.** This repo is `criptocbas/Reflux` (the project's working name during early scoping); the product name landed at **Ballast** during design review. We kept the GitHub URL as a small origin-story Easter egg; everything else — workspace name, packages (`@ballast/*`), database, branding — is Ballast. See [`docs/brand.md`](./docs/brand.md) for the full brand decision.
+<!-- Drop a screenshot at docs/screenshots/hero.png (suggested 1600×900) and uncomment to render at the top of the README:
+<p align="center"><img src="docs/screenshots/hero.png" alt="Ballast — yield with a built-in tail-risk hedge" width="900"></p>
+-->
 
 ---
 
 ## Why this is "oh"
 
 Jupiter built **Prediction** as a speculation product and **Lend** as a yield product. Ballast composes them as the *underwriting layer* and the *premium engine* of a yield-bearing insurance vault — a flip neither product was designed for, but which the public APIs make possible. Depositors never directly pay a premium; the vault self-insures with native Jupiter primitives.
+
+---
+
+## Bounty deliverables
+
+Jupiter's rubric weights this submission across four buckets. We treat each as a first-class deliverable:
+
+| Weight | Deliverable | Where |
+|---|---|---|
+| **35%** | DX report | [`DX-REPORT.md`](./DX-REPORT.md) — 27 concrete findings on the Jupiter APIs / SDKs we touched, each with the specific endpoint, why it matters, and a suggested Monday-morning fix. |
+| **25%** | AI Stack feedback | [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md) — per-tool analysis (Skills × 2, CLI, MCP, llms.txt) with what worked, what misled, file:line receipts, scores, and a top-5 prioritized recommendation list. |
+| **25%** | Technical execution | This repo — live on Solana mainnet, 43 passing tests, end-to-end deposit / withdraw / rebalance / claim flow, sign-message auth, admin-gated mutations, auto-deposit-recovery watcher. See [Live state](#live-state) and [How to run](#how-to-run). |
+| **15%** | Creativity & ambition | The composition itself — yield → hedge, Lend × Prediction, an insurance vault that self-insures with native Jupiter primitives. See [Why this is "oh"](#why-this-is-oh). |
+
+Companion materials: [`docs/dx-log/`](./docs/dx-log/) (raw friction log, captured during build), [`docs/demo-script.md`](./docs/demo-script.md) (90-second demo walkthrough), and the orchestrator's `/dx/observations` endpoint (live Jupiter API call feed, surfaced at the public `/dx` page).
 
 ---
 
@@ -127,22 +151,21 @@ POST /api/withdrawals/request  signed withdrawal (settles inline if possible)
 
 ```bash
 pnpm typecheck      # all packages
-pnpm test           # vitest: 25 tests across shared (units), accountant (shares + distribution),
-                    # nonces (sign-message + replay), basket-config validation
+pnpm test           # vitest: 43 tests — shared (unit conversions), accountant (share math),
+                    # distribution (pro-rata payouts), nonces (sign-message + replay protection),
+                    # rebalance (cooldown / preview), deposit-watcher (PDA classification +
+                    # SPL transfer parsing)
 pnpm --filter @ballast/web run build   # production Next.js build
 ```
 
-All green at the time of the final commit.
+All passing on `main`.
 
 ---
 
-## Bounty deliverables
+## Notes on the name
 
-This project is built for Jupiter's bounty, where the **Developer Experience report is 35% of the judging weight** and the **AI Stack feedback is 25%**. We treat them as separate documents:
+This repo is `criptocbas/Reflux` — the project's working name during early scoping. The product name landed at **Ballast** during design review (`reflux.finance` was taken, the first Google result for "Reflux" is a medical condition, and "Ballast" has a metaphor that explains the product in one word). The GitHub URL is kept as a small origin-story Easter egg; everything else — workspace name, packages (`@ballast/*`), database, branding — is Ballast. See [`docs/brand.md`](./docs/brand.md) for the full brand decision.
 
-- **DX report (35%)** — [`DX-REPORT.md`](./DX-REPORT.md). 27 concrete findings on the Jupiter APIs / SDKs we touched, each with the specific endpoint, why it matters, and a suggested Monday-morning fix.
-- **AI Stack feedback (25%)** — [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md). Per-tool analysis (Skills × 2, CLI, MCP, llms.txt) with what worked, what misled, file:line receipts, scores, and a top-5 prioritized recommendation list.
-- **Running raw log** — [`docs/dx-log/`](./docs/dx-log/), captured in real time during development. The DX report and AI feedback both crystallize from this.
-- **Live transparency surface** — the orchestrator's `/dx/observations` endpoint streams every Jupiter API call live, and the public `/dx` page renders it.
+## License
 
-The 90-second demo script is at [`docs/demo-script.md`](./docs/demo-script.md).
+[MIT](./LICENSE) © 2026 Sebastian Barrientos.

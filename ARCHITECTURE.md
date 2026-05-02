@@ -146,9 +146,9 @@ We deliberately keep this simple for v1. Sophistication = v2.
 ## Project layout
 
 ```
-reflux/
+ballast/
 ├── apps/
-│   ├── web/                 # Next.js 15 (App Router)
+│   ├── web/                 # Next.js 16 (App Router)
 │   │   ├── app/
 │   │   │   ├── page.tsx          (landing)
 │   │   │   ├── deposit/page.tsx

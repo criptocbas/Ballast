@@ -20,10 +20,11 @@
 ## Where they live
 
 ```
-reflux/
+ballast/
 ├── .mcp.json                                    # Docs MCP config
 ├── .claude/skills/integrating-jupiter/          # SKILL.md for cross-API guidance
 ├── .claude/skills/jupiter-lend/                 # SKILL.md for Lend deep-dive
+├── skills-lock.json                             # skills CLI lockfile (re-installable)
 └── docs/api-research/                           # raw probe outputs
 ```
 

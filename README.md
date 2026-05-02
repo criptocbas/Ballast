@@ -4,7 +4,7 @@
 
 Built for the Solana Frontier Hackathon — Jupiter *"Not Your Regular Bounty"* sidetrack.
 
-> **Note on the name.** This repo is `criptocbas/Reflux` (the project's working name during early scoping); the product name landed at **Ballast** during design review. We kept the repo URL and `@reflux/*` package names intact for git-history continuity. See [`docs/brand.md`](./docs/brand.md) for the full brand decision.
+> **Note on the name.** This repo is `criptocbas/Reflux` (the project's working name during early scoping); the product name landed at **Ballast** during design review. We kept the GitHub URL as a small origin-story Easter egg; everything else — workspace name, packages (`@ballast/*`), database, branding — is Ballast. See [`docs/brand.md`](./docs/brand.md) for the full brand decision.
 
 ---
 
@@ -66,19 +66,19 @@ The orchestrator opens SQLite, runs migrations on first boot, schedules the reba
 
 ```bash
 # Vault on-chain balances (SOL + SPL tokens)
-pnpm --filter @reflux/orchestrator exec tsx src/scripts/checkVaultBalance.ts
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/checkVaultBalance.ts
 
 # Print the vault public key (handy for funding)
-pnpm --filter @reflux/orchestrator exec tsx src/scripts/derivePubkey.ts
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/derivePubkey.ts
 
 # Manually deposit USDC into Jupiter Lend Earn (--dry-run simulates first)
-pnpm --filter @reflux/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dry-run
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dry-run
 
 # Discover live "Up or Down" markets for an asset
-pnpm --filter @reflux/orchestrator exec tsx src/scripts/findMarket.ts Bitcoin
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/findMarket.ts Bitcoin
 
 # Open a NO-contract hedge on a specific market (--dry-run simulates first)
-pnpm --filter @reflux/orchestrator exec tsx src/scripts/openHedge.ts POLY-1345530 5 --dry-run
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts POLY-1345530 5 --dry-run
 ```
 
 ### 4) Manual rebalance + claim during demos
@@ -129,7 +129,7 @@ POST /api/withdrawals/request  signed withdrawal (settles inline if possible)
 pnpm typecheck      # all packages
 pnpm test           # vitest: 25 tests across shared (units), accountant (shares + distribution),
                     # nonces (sign-message + replay), basket-config validation
-pnpm --filter @reflux/web run build   # production Next.js build
+pnpm --filter @ballast/web run build   # production Next.js build
 ```
 
 All green at the time of the final commit.

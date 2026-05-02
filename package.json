@@ -1,7 +1,7 @@
 {
   "name": "ballast",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets.",
   "packageManager": "pnpm@10.30.2",
   "engines": {

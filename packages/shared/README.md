@@ -1,4 +1,4 @@
-# @reflux/shared
+# @ballast/shared
 
 Typed Jupiter API clients and shared utilities.
 
@@ -10,7 +10,7 @@ Typed Jupiter API clients and shared utilities.
 
 ## Why a thin client (and not a full SDK)
 
-Jupiter ships official SDKs (`@jup-ag/lend`, `@jup-ag/lend-read`) that we use for transaction-building flows. But for read-only API exploration — which dominates Reflux's surface area — a thin typed client gives us:
+Jupiter ships official SDKs (`@jup-ag/lend`, `@jup-ag/lend-read`) that we use for transaction-building flows. But for read-only API exploration — which dominates Ballast's surface area — a thin typed client gives us:
 
 1. Full visibility into what the API actually returns (including undocumented fields)
 2. The `onObservation` hook that powers the public DX log (a key differentiator)

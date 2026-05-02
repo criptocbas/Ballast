@@ -1,12 +1,12 @@
-# @reflux/orchestrator
+# @ballast/orchestrator
 
-The off-chain rebalance engine. Owns the vault keypair, runs the daily rebalance loop, exposes a thin HTTP API to the web frontend, and emits the public DX log.
+The off-chain rebalance engine. Owns the vault keypair, runs the rebalance loop, exposes the HTTP API to the web frontend, and emits the public DX log.
 
 ## Run locally
 
 ```bash
 # from repo root
-pnpm --filter @reflux/orchestrator dev
+pnpm --filter @ballast/orchestrator dev
 ```
 
 Reads env from `.env` at the repo root (see `.env.example` there).

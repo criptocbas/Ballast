@@ -34,11 +34,15 @@ const ConfigSchema = z.object({
   JUPITER_API_KEY: z.string().min(1).optional(),
   JUPITER_API_BASE_URL: z.string().url().default('https://api.jup.ag'),
   SOLANA_RPC_URL: z.string().url().optional(),
+  /** Optional secondary RPC; if set, RPC reads automatically retry against it on primary failure. */
+  SOLANA_RPC_URL_FALLBACK: z.string().url().optional(),
   SOLANA_CLUSTER: z.enum(['mainnet-beta', 'devnet']).default('mainnet-beta'),
   VAULT_KEYPAIR_BASE58: z.string().min(1).optional(),
   DATABASE_URL: z.string().default('file:./ballast.sqlite'),
   ORCHESTRATOR_PORT: z.coerce.number().int().positive().default(4000),
   REBALANCE_CRON: z.string().default('0 0 * * *'),
+  /** Independent withdrawal-settlement loop — runs more frequently than the rebalance. */
+  WITHDRAWAL_PROCESS_CRON: z.string().default('*/10 * * * *'),
   HEDGE_BUDGET_FRACTION: z.coerce.number().min(0).max(1).default(0.5),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   /** Required for admin-only endpoints (rebalance trigger, claim, depositor list). */

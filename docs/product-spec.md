@@ -1,7 +1,9 @@
 # Ballast — Product Spec (v1)
 
-**Status:** v1 scope locked
-**Captured:** 2026-04-30
+**Status:** Original v1 planning spec, captured 2026-04-30. Preserved as a planning artifact.
+**For as-built reality:** see [`README.md`](../README.md) (current state) and [`ARCHITECTURE.md`](../ARCHITECTURE.md) (as-shipped architecture). For the engineering findings, see [`DX-REPORT.md`](../DX-REPORT.md).
+
+> ⚠️ **Read this doc as a snapshot, not as a current source of truth.** Several flow descriptions, success-metric targets, and "✅" submission-deliverable claims below were aspirational at planning time. The build deviated from spec in a few places — the deviations are documented in DX-REPORT.md (most notably DX-GAP-#24 explaining why the 5-market basket compressed to single-market, and DX-GAP-#28 explaining the withdrawable-clamp the spec didn't anticipate). The most accurate up-to-date description of what shipped lives in ARCHITECTURE.md's "Definition of done — as shipped" section.
 
 ---
 

@@ -124,17 +124,42 @@ export function MePageClient({ orchestratorUrl }: MePageClientProps) {
       </div>
 
       <section className="card p-6">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Withdraw</h2>
             <p className="mt-1 text-sm text-[var(--fg-dim)]">
-              Withdraw any portion of your net balance back to your wallet. The orchestrator
-              settles immediately if the vault has free USDC, otherwise queues for the next
-              rebalance tick (which pulls from Lend Earn).
+              Withdraw any portion of your <em>withdrawable now</em> balance back to your wallet.
+              The orchestrator settles immediately if the vault has free USDC, otherwise queues
+              for the next rebalance tick (which pulls from Lend Earn).
             </p>
           </div>
-          <Stat label="Net balance" value={`$${me.balance.net.toFixed(4)}`} mono small />
+          <Stat
+            label="Withdrawable now"
+            value={`$${me.withdrawable.withdrawableNow.toFixed(4)}`}
+            mono
+            small
+            tone="positive"
+          />
         </div>
+
+        {me.withdrawable.hedgeLockedUsdc > 0.0001 && (
+          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+            <span className="font-medium text-fg">
+              ${me.withdrawable.hedgeLockedUsdc.toFixed(2)} locked in open hedges.
+            </span>{' '}
+            Your notional balance is{' '}
+            <span className="font-mono tabular-nums text-fg">
+              ${me.withdrawable.notionalNet.toFixed(2)}
+            </span>
+            , but the vault&apos;s redeemable USDC right now is{' '}
+            <span className="font-mono tabular-nums text-fg">
+              ${me.withdrawable.redeemableVaultUsdc.toFixed(2)}
+            </span>{' '}
+            (wallet + Lend Earn). The remainder is in open NO-contract positions that become
+            liquid only when those markets resolve.
+          </div>
+        )}
+
         <div className="mt-5 grid grid-cols-3 gap-3 border-t border-[var(--border)] pt-4 text-xs">
           <div>
             <div className="uppercase tracking-wider text-[var(--fg-muted)]">Contributed</div>
@@ -156,12 +181,18 @@ export function MePageClient({ orchestratorUrl }: MePageClientProps) {
           </div>
         </div>
         <div className="mt-6">
-          {me.balance.net > 0 ? (
+          {me.withdrawable.withdrawableNow > 0.0001 ? (
             <WithdrawForm
               orchestratorUrl={orchestratorUrl}
-              maxUsdc={me.balance.net}
+              maxUsdc={me.withdrawable.withdrawableNow}
               onSettled={() => void refresh()}
             />
+          ) : me.balance.net > 0.0001 ? (
+            <p className="text-sm text-[var(--fg-muted)]">
+              Vault has no redeemable USDC right now — your $
+              {me.balance.net.toFixed(2)} notional is all hedge-locked. Withdrawable will recover
+              when a rebalance tick withdraws yield from Lend Earn or a hedge resolves.
+            </p>
           ) : (
             <p className="text-sm text-[var(--fg-muted)]">
               Nothing to withdraw yet — make a deposit first.

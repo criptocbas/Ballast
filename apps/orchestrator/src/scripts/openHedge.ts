@@ -13,6 +13,8 @@
 import { openHedgeOrder, waitForOrderFill } from '../prediction.js';
 import { getJupiterClients } from '../jupiter.js';
 import { getVaultWallet } from '../wallet.js';
+import { getDb } from '../db/index.js';
+import { hedges as hedgesTable } from '../db/schema.js';
 
 interface ParsedArgs {
   marketId: string;
@@ -34,7 +36,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   if (!marketIdRaw || !usdcRaw) {
     console.error(
       'Usage: openHedge.ts <marketId> <usdc> [--side=yes|no] [--dry-run]\n' +
-        '  Default side is NO (the typical Reflux hedge direction).',
+        '  Default side is NO (the typical Ballast hedge direction).',
     );
     process.exit(2);
   }
@@ -75,6 +77,32 @@ async function main(): Promise<void> {
   console.log(`  contracts      : ${result.contracts}`);
   if (!args.dryRun) {
     console.log(`  solscan        : https://solscan.io/tx/${result.signature}`);
+
+    // Persist to the local hedges table so /vault/hedges and the rebalance
+    // loop see this position alongside ones the cron itself opened. Idempotent
+    // on positionPubkey — re-running this script is safe.
+    try {
+      getDb()
+        .insert(hedgesTable)
+        .values({
+          positionPubkey: result.positionPubkey,
+          marketId: result.marketId,
+          marketTitle: market.title,
+          eventTitle: market.title,
+          side: args.isYes ? 'YES' : 'NO',
+          contracts: Number(result.contracts),
+          costBasisUsd: result.depositUsdc,
+          openSignature: result.signature,
+        })
+        .onConflictDoNothing()
+        .run();
+      console.log('  persisted to hedges table');
+    } catch (err) {
+      console.error(
+        '  WARN: failed to persist hedge row (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
   console.log('');
 

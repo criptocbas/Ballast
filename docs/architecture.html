@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ballast — How it works</title>
+  <meta name="description" content="A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets. Architecture explainer." />
+  <style>
+    :root {
+      --bg: #08090f;
+      --bg-elev: #0f1118;
+      --bg-elev-2: #161922;
+      --fg: #f0f2f5;
+      --fg-dim: #9aa3b0;
+      --fg-muted: #6a7280;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --accent: #d97706;
+      --accent-soft: rgba(217, 119, 6, 0.16);
+      --positive: #10b981;
+      --warn: #eab308;
+      --danger: #ef4444;
+      --lend: #3b82f6;
+      --pred: #a855f7;
+      --swap: #06b6d4;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      font-feature-settings: "ss01";
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono, code, pre {
+      font-family: "Geist Mono", "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 96px;
+    }
+
+    /* ---------------- Header ---------------- */
+    header.site {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 56px;
+    }
+    .mark {
+      width: 22px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    .wordmark { font-weight: 600; font-size: 18px; letter-spacing: -0.01em; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      color: var(--fg-muted);
+    }
+    .pill-accent {
+      color: var(--accent);
+      border-color: var(--accent-soft);
+      background: var(--accent-soft);
+    }
+    .pill-live {
+      color: var(--positive);
+      border-color: rgba(16, 185, 129, 0.24);
+    }
+    .pill-live::before {
+      content: "";
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--positive);
+      border-radius: 50%;
+      margin-right: 6px;
+      transform: translateY(-1px);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .header-spacer { flex: 1; }
+    .header-meta { color: var(--fg-muted); font-size: 13px; }
+
+    /* ---------------- Hero ---------------- */
+    .hero h1 {
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+      margin: 0 0 20px;
+      max-width: 18ch;
+      text-wrap: balance;
+    }
+    .hero .lede {
+      font-size: 18px;
+      color: var(--fg-dim);
+      max-width: 60ch;
+      margin: 0 0 32px;
+    }
+    .hero .lede em {
+      color: var(--fg);
+      font-style: normal;
+      font-weight: 500;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 32px;
+    }
+    @media (max-width: 720px) {
+      .hero-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .stat {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+    .stat-label {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-family: "Geist Mono", ui-monospace, monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 20px;
+      font-weight: 500;
+    }
+    .stat-sub { font-size: 12px; color: var(--fg-muted); margin-top: 4px; }
+    .stat-accent .stat-value { color: var(--accent); }
+    .stat-positive .stat-value { color: var(--positive); }
+
+    /* ---------------- Sections ---------------- */
+    section { margin-top: 80px; scroll-margin-top: 24px; }
+    h2 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 8px;
+    }
+    h2 .num {
+      color: var(--fg-muted);
+      font-weight: 400;
+      margin-right: 12px;
+    }
+    .section-lede {
+      color: var(--fg-dim);
+      max-width: 70ch;
+      margin: 0 0 32px;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+    }
+
+    /* ---------------- Cards ---------------- */
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 720px) {
+      .card-grid.cols-2, .card-grid.cols-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ---------------- Architecture diagram (SVG) ---------------- */
+    .diagram {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      overflow-x: auto;
+    }
+    .diagram svg { display: block; max-width: 100%; height: auto; }
+
+    /* ---------------- Tables ---------------- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      font-weight: 500;
+    }
+    td.mono { font-family: "Geist Mono", ui-monospace, monospace; font-size: 13px; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ---------------- Rebalance flow (numbered) ---------------- */
+    .flow {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 20px 18px;
+    }
+    .flow .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elev-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Geist Mono", ui-monospace, monospace;
+      font-size: 13px;
+      color: var(--fg-dim);
+    }
+    .flow .step {
+      padding-bottom: 12px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .flow .step:last-child { border-bottom: none; }
+    .flow h4 { margin: 4px 0 6px; font-size: 15px; font-weight: 600; }
+    .flow p { margin: 0; color: var(--fg-dim); font-size: 14px; }
+    .flow code {
+      background: var(--bg-elev-2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--fg);
+    }
+
+    /* ---------------- Tag chips ---------------- */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chip {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-elev-2);
+      color: var(--fg-dim);
+      font-family: "Geist Mono", ui-monospace, monospace;
+    }
+    .chip.lend { color: var(--lend); border-color: rgba(59, 130, 246, 0.3); }
+    .chip.pred { color: var(--pred); border-color: rgba(168, 85, 247, 0.3); }
+    .chip.swap { color: var(--swap); border-color: rgba(6, 182, 212, 0.3); }
+    .chip.tokens { color: var(--positive); border-color: rgba(16, 185, 129, 0.3); }
+    .chip.portfolio { color: var(--warn); border-color: rgba(234, 179, 8, 0.3); }
+
+    /* ---------------- Callouts ---------------- */
+    .callout {
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin: 20px 0;
+      color: var(--fg);
+      font-size: 14px;
+    }
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: rgba(234, 179, 8, 0.08);
+    }
+    .callout strong { color: var(--accent); }
+    .callout.warn strong { color: var(--warn); }
+
+    /* ---------------- Footer ---------------- */
+    footer {
+      margin-top: 96px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      color: var(--fg-muted);
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    /* ---------------- TOC ---------------- */
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      font-size: 13px;
+      margin-top: 24px;
+    }
+    .toc a {
+      color: var(--fg-dim);
+      text-decoration: none;
+    }
+    .toc a:hover { color: var(--fg); }
+
+    /* ---------------- Utility ---------------- */
+    .muted { color: var(--fg-muted); }
+    .dim { color: var(--fg-dim); }
+    .nowrap { white-space: nowrap; }
+    hr.soft { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- ============== HEADER ============== -->
+    <header class="site">
+      <svg class="mark" viewBox="0 0 22 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <line x1="11" y1="0" x2="11" y2="20" stroke="#f0f2f5" stroke-width="1.5" />
+        <circle cx="11" cy="23" r="4" fill="#d97706" />
+      </svg>
+      <span class="wordmark">Ballast</span>
+      <span class="pill pill-accent">v1</span>
+      <span class="pill pill-live">Mainnet</span>
+      <div class="header-spacer"></div>
+      <span class="header-meta mono">2026-05-08 · architecture</span>
+    </header>
+
+    <!-- ============== HERO ============== -->
+    <section class="hero" style="margin-top: 0;">
+      <h1>Yield with a built-in tail-risk hedge.</h1>
+      <p class="lede">
+        A USDC vault where <em>Jupiter Lend</em> yield finances NO-contract hedges on
+        <em>Jupiter Prediction</em> tail-risk markets. The yield is the premium engine;
+        the hedges are the ballast that keeps depositors stable when crypto markets storm.
+      </p>
+
+      <div class="hero-grid">
+        <div class="stat stat-accent">
+          <div class="stat-label">Vault TVL</div>
+          <div class="stat-value">~$26</div>
+          <div class="stat-sub">live mainnet, test funds</div>
+        </div>
+        <div class="stat stat-positive">
+          <div class="stat-label">Lend position</div>
+          <div class="stat-value">$19.75</div>
+          <div class="stat-sub">jlUSDC @ ~4.24% APY</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Open hedges</div>
+          <div class="stat-value">16 NO</div>
+          <div class="stat-sub">POLY-1345531 · BTC&gt;$90k</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Tests passing</div>
+          <div class="stat-value">52 / 52</div>
+          <div class="stat-sub">6 shared + 46 orchestrator</div>
+        </div>
+      </div>
+
+      <nav class="toc">
+        <a href="#oh">The "oh"</a>
+        <a href="#system">System</a>
+        <a href="#rebalance">Rebalance loop</a>
+        <a href="#apis">APIs</a>
+        <a href="#robustness">Robustness</a>
+        <a href="#custody">Custody</a>
+        <a href="#bounty">Bounty</a>
+      </nav>
+    </section>
+
+    <!-- ============== "OH" ============== -->
+    <section id="oh">
+      <h2><span class="num">01</span>The composition</h2>
+      <p class="section-lede">
+        Jupiter built <strong>Prediction</strong> as a speculation product and <strong>Lend</strong> as a yield product.
+        Ballast composes them as the underwriting layer and the premium engine of a yield-bearing insurance vault —
+        a flip neither product was designed for, but which the public APIs make possible.
+        Depositors never directly pay a premium; the vault self-insures with native Jupiter primitives.
+      </p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 880 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="oh-title">
+          <title id="oh-title">Yield-to-hedge composition</title>
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9aa3b0" />
+            </marker>
+            <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+            </marker>
+          </defs>
+
+          <!-- Depositor -->
+          <g>
+            <rect x="20" y="100" width="140" height="80" rx="8" fill="#161922" stroke="rgba(255,255,255,0.16)" />
+            <text x="90" y="135" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="13" font-weight="500">Depositor</text>
+            <text x="90" y="155" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="11">USDC in →</text>
+          </g>
+
+          <!-- Vault -->
+          <g>
+            <rect x="240" y="60" width="200" height="160" rx="10" fill="#0f1118" stroke="#d97706" stroke-width="1.5" />
+            <text x="340" y="90" text-anchor="middle" fill="#d97706" font-family="Geist, sans-serif" font-size="14" font-weight="600">Ballast vault</text>
+            <text x="340" y="110" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">B6Mt…2zsX</text>
+            <line x1="260" y1="125" x2="420" y2="125" stroke="rgba(255,255,255,0.08)" />
+            <text x="340" y="148" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="12">share accounting</text>
+            <text x="340" y="168" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="12">rebalance loop</text>
+            <text x="340" y="188" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="12">claim reaper</text>
+          </g>
+
+          <!-- Jupiter Lend -->
+          <g>
+            <rect x="540" y="30" width="160" height="80" rx="8" fill="#161922" stroke="rgba(59,130,246,0.5)" />
+            <text x="620" y="60" text-anchor="middle" fill="#3b82f6" font-family="Geist Mono, monospace" font-size="12" font-weight="500">Jupiter Lend</text>
+            <text x="620" y="80" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="11">jlUSDC · 4.24% APY</text>
+            <text x="620" y="96" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="11">premium engine</text>
+          </g>
+
+          <!-- Jupiter Prediction -->
+          <g>
+            <rect x="540" y="170" width="160" height="80" rx="8" fill="#161922" stroke="rgba(168,85,247,0.5)" />
+            <text x="620" y="200" text-anchor="middle" fill="#a855f7" font-family="Geist Mono, monospace" font-size="12" font-weight="500">Jupiter Prediction</text>
+            <text x="620" y="220" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="11">NO contracts · tail risk</text>
+            <text x="620" y="236" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="11">underwriting layer</text>
+          </g>
+
+          <!-- Tail event payout back -->
+          <g>
+            <rect x="760" y="100" width="100" height="80" rx="8" fill="#161922" stroke="rgba(16,185,129,0.5)" />
+            <text x="810" y="130" text-anchor="middle" fill="#10b981" font-family="Geist Mono, monospace" font-size="12" font-weight="500">Payout</text>
+            <text x="810" y="150" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">on tail event</text>
+            <text x="810" y="165" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">→ depositors</text>
+          </g>
+
+          <!-- Arrows -->
+          <line x1="160" y1="140" x2="240" y2="140" stroke="#9aa3b0" stroke-width="1.5" marker-end="url(#arr)" />
+          <line x1="440" y1="100" x2="540" y2="70" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#arr)" />
+          <line x1="540" y1="90" x2="440" y2="125" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr)" />
+          <line x1="440" y1="180" x2="540" y2="205" stroke="#a855f7" stroke-width="1.5" marker-end="url(#arr)" />
+          <line x1="540" y1="225" x2="440" y2="200" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr)" />
+          <line x1="700" y1="210" x2="780" y2="160" stroke="#10b981" stroke-width="1.5" marker-end="url(#arr)" />
+          <line x1="760" y1="135" x2="450" y2="135" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr)" />
+
+          <!-- Labels on arrows -->
+          <text x="200" y="132" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">deposit</text>
+          <text x="490" y="80" text-anchor="middle" fill="#3b82f6" font-family="Geist Mono, monospace" font-size="10">↗ deposit</text>
+          <text x="490" y="125" text-anchor="middle" fill="#3b82f6" font-family="Geist Mono, monospace" font-size="10">↙ yield</text>
+          <text x="490" y="195" text-anchor="middle" fill="#a855f7" font-family="Geist Mono, monospace" font-size="10">↘ buy NO</text>
+          <text x="490" y="240" text-anchor="middle" fill="#a855f7" font-family="Geist Mono, monospace" font-size="10">↖ position</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ============== SYSTEM ============== -->
+    <section id="system">
+      <h2><span class="num">02</span>System</h2>
+      <p class="section-lede">
+        Three packages, one daily cron, five Jupiter APIs. Custodial v1 — single keypair, server-side only.
+      </p>
+
+      <div class="diagram">
+        <svg viewBox="0 0 880 460" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="sys-title">
+          <title id="sys-title">Ballast system architecture</title>
+          <defs>
+            <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9aa3b0" />
+            </marker>
+          </defs>
+
+          <!-- User -->
+          <g>
+            <circle cx="60" cy="70" r="18" fill="#161922" stroke="rgba(255,255,255,0.16)" />
+            <text x="60" y="74" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="11">user</text>
+            <text x="60" y="105" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">wallet adapter</text>
+          </g>
+
+          <!-- apps/web -->
+          <g>
+            <rect x="140" y="30" width="240" height="130" rx="10" fill="#0f1118" stroke="rgba(255,255,255,0.16)" />
+            <text x="260" y="56" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="13" font-weight="600">apps/web</text>
+            <text x="260" y="72" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">Next.js 16 · App Router · Tailwind v4</text>
+            <line x1="160" y1="84" x2="360" y2="84" stroke="rgba(255,255,255,0.08)" />
+            <text x="180" y="105" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">/deposit</text>
+            <text x="180" y="122" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">/vault</text>
+            <text x="180" y="139" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">/me</text>
+            <text x="280" y="105" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">/dx</text>
+            <text x="280" y="122" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">/about</text>
+          </g>
+
+          <!-- apps/orchestrator -->
+          <g>
+            <rect x="140" y="200" width="600" height="170" rx="10" fill="#0f1118" stroke="#d97706" stroke-width="1.5" />
+            <text x="440" y="226" text-anchor="middle" fill="#d97706" font-family="Geist, sans-serif" font-size="13" font-weight="600">apps/orchestrator</text>
+            <text x="440" y="242" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">Fastify v5 · Drizzle ORM · better-sqlite3 · node-cron · tweetnacl</text>
+            <line x1="160" y1="254" x2="720" y2="254" stroke="rgba(255,255,255,0.08)" />
+
+            <!-- Internal modules -->
+            <rect x="160" y="270" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="227" y="288" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">rebalance.ts</text>
+            <text x="227" y="304" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">daily cron + cooldown</text>
+
+            <rect x="305" y="270" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="372" y="288" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">accountant.ts</text>
+            <text x="372" y="304" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">share + withdrawable</text>
+
+            <rect x="450" y="270" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="517" y="288" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">prediction.ts</text>
+            <text x="517" y="304" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">hedge orders</text>
+
+            <rect x="595" y="270" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="662" y="288" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">claimer.ts</text>
+            <text x="662" y="304" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">payout settle</text>
+
+            <rect x="160" y="320" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="227" y="338" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">lend.ts</text>
+            <text x="227" y="354" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">deposit/withdraw</text>
+
+            <rect x="305" y="320" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="372" y="338" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">tx.ts</text>
+            <text x="372" y="354" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">V0 retry-on-expire</text>
+
+            <rect x="450" y="320" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="517" y="338" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">depositWatcher.ts</text>
+            <text x="517" y="354" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">auto-recovery</text>
+
+            <rect x="595" y="320" width="135" height="44" rx="6" fill="#161922" stroke="rgba(255,255,255,0.08)" />
+            <text x="662" y="338" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">nonces · auth</text>
+            <text x="662" y="354" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="10">sign-msg + admin</text>
+          </g>
+
+          <!-- packages/shared -->
+          <g>
+            <rect x="430" y="30" width="310" height="130" rx="10" fill="#0f1118" stroke="rgba(255,255,255,0.16)" />
+            <text x="585" y="56" text-anchor="middle" fill="#f0f2f5" font-family="Geist, sans-serif" font-size="13" font-weight="600">packages/shared</text>
+            <text x="585" y="72" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="10">typed Jupiter clients · onObservation hook</text>
+            <line x1="450" y1="84" x2="720" y2="84" stroke="rgba(255,255,255,0.08)" />
+            <text x="450" y="105" fill="#3b82f6" font-family="Geist Mono, monospace" font-size="11">lend</text>
+            <text x="510" y="105" fill="#a855f7" font-family="Geist Mono, monospace" font-size="11">prediction</text>
+            <text x="610" y="105" fill="#06b6d4" font-family="Geist Mono, monospace" font-size="11">swap</text>
+            <text x="670" y="105" fill="#10b981" font-family="Geist Mono, monospace" font-size="11">tokens</text>
+            <text x="450" y="125" fill="#eab308" font-family="Geist Mono, monospace" font-size="11">portfolio</text>
+            <text x="540" y="125" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="11">+ utils (micro-USD, …)</text>
+          </g>
+
+          <!-- SQLite -->
+          <g>
+            <rect x="780" y="270" width="80" height="100" rx="6" fill="#161922" stroke="rgba(255,255,255,0.16)" />
+            <text x="820" y="295" text-anchor="middle" fill="#f0f2f5" font-family="Geist Mono, monospace" font-size="11">SQLite</text>
+            <text x="820" y="312" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="9">depositors</text>
+            <text x="820" y="325" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="9">withdrawals</text>
+            <text x="820" y="338" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="9">hedges</text>
+            <text x="820" y="351" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="9">vault_state</text>
+            <text x="820" y="364" text-anchor="middle" fill="#9aa3b0" font-family="Geist, sans-serif" font-size="9">events</text>
+          </g>
+
+          <!-- Jupiter APIs -->
+          <g>
+            <rect x="140" y="400" width="600" height="44" rx="8" fill="#0f1118" stroke="rgba(255,255,255,0.16)" />
+            <text x="440" y="427" text-anchor="middle" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="11">Jupiter Developer Platform · /lend · /prediction · /swap · /tokens · /portfolio</text>
+          </g>
+
+          <!-- Arrows -->
+          <line x1="78" y1="70" x2="138" y2="70" stroke="#9aa3b0" stroke-width="1" marker-end="url(#arr2)" />
+          <line x1="260" y1="160" x2="260" y2="200" stroke="#9aa3b0" stroke-width="1" marker-end="url(#arr2)" />
+          <line x1="585" y1="160" x2="440" y2="200" stroke="#9aa3b0" stroke-width="1" stroke-dasharray="2,3" marker-end="url(#arr2)" />
+          <line x1="500" y1="160" x2="370" y2="200" stroke="#9aa3b0" stroke-width="1" stroke-dasharray="2,3" marker-end="url(#arr2)" />
+          <line x1="730" y1="320" x2="780" y2="320" stroke="#9aa3b0" stroke-width="1" marker-end="url(#arr2)" />
+          <line x1="440" y1="370" x2="440" y2="400" stroke="#9aa3b0" stroke-width="1" marker-end="url(#arr2)" />
+
+          <!-- annotations -->
+          <text x="280" y="186" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="9">HTTP /vault/info · sign-msg</text>
+          <text x="755" y="316" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="9">WAL</text>
+          <text x="455" y="392" fill="#9aa3b0" font-family="Geist Mono, monospace" font-size="9">via packages/shared clients</text>
+        </svg>
+      </div>
+
+      <div class="callout warn">
+        <strong>Custody:</strong> v1 is explicitly <em>custodial</em>. A single Solana keypair (the "vault keypair") holds all
+        deposits and Jupiter positions. Private key in env var, server-side only — never logged, never in any
+        <code>NEXT_PUBLIC_*</code>, never in any <code>apps/web</code> file. Documented at length in
+        <a href="../ARCHITECTURE.md">ARCHITECTURE.md</a>; v2 path is an on-chain vault program issuing share tokens.
+      </div>
+    </section>
+
+    <!-- ============== REBALANCE ============== -->
+    <section id="rebalance">
+      <h2><span class="num">03</span>Rebalance loop</h2>
+      <p class="section-lede">
+        The heart of the system. One cron tick a day at 00:00 UTC, plus an admin-triggered manual run for demos.
+        Cooldown is persisted to SQLite (<code>vault_state</code> table) so a crash inside the cooldown window
+        cannot bypass the gate.
+      </p>
+
+      <div class="card">
+        <div class="flow">
+          <div class="step-num">1</div>
+          <div class="step">
+            <h4>Acquire cooldown</h4>
+            <p>Read <code>vault_state['rebalance.last_tick_started_at_ms']</code> from SQLite. If within the 1-hour cooldown window, abort. Otherwise mark the tick start and proceed.</p>
+          </div>
+
+          <div class="step-num">2</div>
+          <div class="step">
+            <h4>Refresh state</h4>
+            <p>Read Lend Earn position, current hedge marks, depositor table, vault USDC + SOL balance. Read paths use <code>withRpcFallback()</code>; primary RPC fails over to <code>SOLANA_RPC_URL_FALLBACK</code> on rate-limit.</p>
+          </div>
+
+          <div class="step-num">3</div>
+          <div class="step">
+            <h4>Withdraw accrued yield</h4>
+            <p>Compute share growth on Lend Earn since last tick. Withdraw the delta via <code>POST /lend/v1/earn/withdraw</code>. Tx is built/signed/sent through <code>buildSimSignSendConfirmV0</code> — up to 2 attempts on <code>BlockhashExpired</code> with a fresh blockhash. Fired in production on 2026-05-07 on a $12.50 deposit.</p>
+          </div>
+
+          <div class="step-num">4</div>
+          <div class="step">
+            <h4>Settle resolved positions</h4>
+            <p><code>claimer.ts</code> walks open hedges, calls <code>POST /prediction/v1/positions/{id}/claim</code> on any resolved-winner contract. Jupiter-supplied transactions are sent <em>as-is</em> — wrapping them in our retry helper would re-sign under a fresh blockhash and break the keeper contract.</p>
+          </div>
+
+          <div class="step-num">5</div>
+          <div class="step">
+            <h4>Convert payouts to USDC</h4>
+            <p>Any non-USDC settlement (e.g. SOL claim residue) goes through Swap V2 (<code>/swap/v2/order</code> → <code>/swap/v2/execute</code>) to land everything in USDC for accounting.</p>
+          </div>
+
+          <div class="step-num">6</div>
+          <div class="step">
+            <h4>Allocate</h4>
+            <p>Split freed USDC by <code>HEDGE_BUDGET_FRACTION</code> (default 50%): half compounds back into Lend Earn, half feeds the hedge bucket.</p>
+          </div>
+
+          <div class="step-num">7</div>
+          <div class="step">
+            <h4>Place hedges</h4>
+            <p>Walk <code>basket.config.json</code>. Allocate per-market <code>hedgeBudget × weight</code>. Skip if &lt; $5 (Jupiter Prediction's per-order minimum — DX-GAP-#18, #24). Skip markets the vault already holds. Place BUY NO via <code>POST /prediction/v1/orders</code>. Persist the new hedge row.</p>
+            <div class="chips">
+              <span class="chip">live demo: 1-market basket (POLY-1345531)</span>
+              <span class="chip">v1.5: 5-market diversified (preserved in JSON)</span>
+            </div>
+          </div>
+
+          <div class="step-num">8</div>
+          <div class="step">
+            <h4>Persist</h4>
+            <p>Append to event log. Write the new tick timestamp to <code>vault_state</code>. Bust the in-memory <code>/vault/info</code> cache so public reads reflect new state immediately. Release the cooldown.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>Decoupled withdrawal worker</h3>
+      <p class="dim" style="max-width: 70ch;">
+        Independent cron (<code>WITHDRAWAL_PROCESS_CRON</code>, default every 10 minutes) processes queued depositor
+        withdrawals. Race-safe: <code>trySettleWithdrawal</code> uses an atomic
+        <code>UPDATE … WHERE status='pending'</code> with a <code>changes === 0</code> check so two workers cannot
+        double-settle. Decoupled so daily-cron crashes don't starve withdrawals.
+      </p>
+    </section>
+
+    <!-- ============== APIs ============== -->
+    <section id="apis">
+      <h2><span class="num">04</span>Jupiter API integration map</h2>
+      <p class="section-lede">
+        Five APIs, ~15 endpoints. The composition lives at the rebalance loop where Lend yield → Swap conversion →
+        Prediction order placement happens in sequence within a single tick.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>API</th>
+            <th>Endpoints</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="chip lend">Lend Earn</span></td>
+            <td class="mono">
+              /earn/tokens<br>
+              /earn/deposit<br>
+              /earn/withdraw<br>
+              /earn/positions<br>
+              /earn/earnings
+            </td>
+            <td>Deposit asset float, position reading, yield extraction. Currently <strong>$19.75</strong> in <code>jlUSDC</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="chip pred">Prediction</span></td>
+            <td class="mono">
+              /v1/events<br>
+              /v1/markets/{id}<br>
+              /v1/orderbook/{id}<br>
+              /v1/orders (POST)<br>
+              /v1/positions<br>
+              /v1/positions/{id}/claim
+            </td>
+            <td>Tail-risk market discovery, hedge order placement, payout claims. Source of <strong>5 of 31</strong> DX findings.</td>
+          </tr>
+          <tr>
+            <td><span class="chip swap">Swap V2</span></td>
+            <td class="mono">
+              /v2/order<br>
+              /v2/execute
+            </td>
+            <td>Premium currency conversion (depositor → USDC) and payout settlement.</td>
+          </tr>
+          <tr>
+            <td><span class="chip tokens">Tokens</span></td>
+            <td class="mono">
+              /v2/search<br>
+              /v2 (by mint)
+            </td>
+            <td>Asset metadata for UI; mapping events to underlying assets.</td>
+          </tr>
+          <tr>
+            <td><span class="chip portfolio">Portfolio</span></td>
+            <td class="mono">/v1/positions/{wallet}</td>
+            <td>Unified view of vault keypair positions for the public transparency dashboard.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============== ROBUSTNESS ============== -->
+    <section id="robustness">
+      <h2><span class="num">05</span>Robustness layer</h2>
+      <p class="section-lede">
+        Six concrete improvements added 2026-05-06 before the demo. All tested. One — the blockhash-expired retry —
+        fired in production the next day on a real $12.50 deposit and recovered cleanly.
+      </p>
+
+      <div class="card-grid cols-2">
+        <div class="card">
+          <h3 style="margin-top:0">1. Persistent rebalance cooldown</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            <code>vault_state</code> KV row (<code>rebalance.last_tick_started_at_ms</code>). Survives orchestrator restart by design — a crash inside the cooldown window cannot bypass the gate.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">2. Decoupled withdrawal worker</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            Independent 10-minute cron. Atomic <code>UPDATE … WHERE status='pending'</code> soft-lock; <code>changes === 0</code> on contention.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">3. Cache bust on admin mutations</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            <code>bustVaultInfoCache()</code> after every <code>/admin/*</code> write so public <code>/vault/info</code> reads reflect new state instead of serving 15s-stale data.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">4. Multi-RPC fallback</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            <code>SOLANA_RPC_URL_FALLBACK</code> via <code>withRpcFallback()</code> for read paths. Write paths intentionally don't fall back — blockhash freshness contract.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">5. Per-route rate limit</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            <code>/api/me/:wallet</code> capped at 60 req/min/IP. Wrapped in a sub-plugin to satisfy Fastify's <code>onRoute</code> hook ordering — a 20-minute lesson.
+          </p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">6. Blockhash-expired tx retry</h3>
+          <p class="dim" style="margin:0;font-size:14px">
+            <code>buildSimSignSendConfirmV0</code> in <code>tx.ts</code> replaces ~80 lines of inline build/sign/send/confirm. Up to 2 attempts with fresh blockhash. <strong style="color:var(--positive)">Real-world validated.</strong>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== CUSTODY ============== -->
+    <section id="custody">
+      <h2><span class="num">06</span>Custody &amp; security boundaries</h2>
+      <p class="section-lede">v1 ships custodial. Mitigations in place; v2 path documented.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Boundary</th>
+            <th>Mitigation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Vault keypair compromise</td>
+            <td class="dim">Stored in env var only; never logged; never exposed to frontend; rotation procedure documented. <strong>Catastrophic if lost</strong> — entire trust surface.</td>
+          </tr>
+          <tr>
+            <td>Frontend → orchestrator API</td>
+            <td class="dim">Sign-message auth: server-issued nonce → client signs canonical message <code>ballast:&lt;purpose&gt;\nnonce=&lt;n&gt;\n&lt;sorted-bindings&gt;</code> → server verifies via tweetnacl, one-shot consume. Replay-resistant.</td>
+          </tr>
+          <tr>
+            <td>Admin endpoints</td>
+            <td class="dim"><code>Authorization: Bearer $ORCHESTRATOR_ADMIN_TOKEN</code> with constant-time comparison. 503 if env unset; 401 on mismatch. Fastify error handler passes 4xx through with structured statusCode (rate-limit 429 reaches the client correctly).</td>
+          </tr>
+          <tr>
+            <td>Withdrawal flow</td>
+            <td class="dim">Signed intent → orchestrator validates against <code>withdrawableNow</code> (DX-GAP-#28 fix), not notional → settles inline if redeemable, else queued. Capped UI at <code>min(notional, shareFraction × redeemable)</code>.</td>
+          </tr>
+          <tr>
+            <td>PII surface</td>
+            <td class="dim"><code>/vault/aggregate</code> is the public depositor surface (count + total only). <code>/admin/depositors</code> is the full list. <code>/api/me/:wallet</code> rate-limited at 60 req/min/IP.</td>
+          </tr>
+          <tr>
+            <td>Bad-actor markets</td>
+            <td class="dim">Curated basket via config file; not user-selectable in v1. Each market entry has a written thesis; closed markets must be re-curated before restore.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============== BOUNTY ============== -->
+    <section id="bounty">
+      <h2><span class="num">07</span>Bounty deliverables</h2>
+      <p class="section-lede">
+        Submission for the Jupiter <em>"Not Your Regular Bounty"</em> sidetrack. Each rubric bucket is a first-class deliverable.
+      </p>
+
+      <div class="card-grid cols-2">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+            <h3 style="margin:0">DX report</h3>
+            <span class="pill pill-accent">35%</span>
+          </div>
+          <p class="dim" style="margin:0 0 12px;font-size:14px">
+            <a href="../DX-REPORT.md">DX-REPORT.md</a> — 31 numbered findings on the Jupiter APIs/SDKs we touched.
+            Each entry: where, what happens, why it matters, suggested fix, severity.
+          </p>
+          <div class="chips">
+            <span class="chip">31 findings</span>
+            <span class="chip">#28 headline</span>
+            <span class="chip">#29-#32 field reports</span>
+            <span class="chip">#13 upstreamed (PR #20)</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+            <h3 style="margin:0">AI Stack feedback</h3>
+            <span class="pill pill-accent">25%</span>
+          </div>
+          <p class="dim" style="margin:0 0 12px;font-size:14px">
+            <a href="ai-stack/FEEDBACK.md">docs/ai-stack/FEEDBACK.md</a> — per-tool analysis: Skills × 2, CLI, MCP, llms.txt.
+          </p>
+          <table style="font-size:13px">
+            <tr><td><code>llms.txt</code></td><td class="num">4.5/5</td></tr>
+            <tr><td>Jupiter CLI</td><td class="num">4/5</td></tr>
+            <tr><td>jupiter-lend skill</td><td class="num">4/5</td></tr>
+            <tr><td>integrating-jupiter skill</td><td class="num">3.5/5</td></tr>
+            <tr><td>Documentation MCP</td><td class="num">2.5/5</td></tr>
+          </table>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+            <h3 style="margin:0">Technical execution</h3>
+            <span class="pill pill-accent">25%</span>
+          </div>
+          <p class="dim" style="margin:0 0 12px;font-size:14px">
+            Live on Solana mainnet. End-to-end deposit / withdraw / rebalance / claim flow.
+            Sign-message auth, admin-gated mutations, auto-deposit-recovery watcher, persistent-state robustness layer.
+          </p>
+          <div class="chips">
+            <span class="chip">52 tests</span>
+            <span class="chip">~$26 TVL</span>
+            <span class="chip">5 APIs · 15 endpoints</span>
+            <span class="chip">production retry fired</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+            <h3 style="margin:0">Creativity &amp; ambition</h3>
+            <span class="pill pill-accent">15%</span>
+          </div>
+          <p class="dim" style="margin:0 0 12px;font-size:14px">
+            The composition itself: Lend yield as the premium engine, Prediction NO contracts as the underwriting layer.
+            An insurance vault that self-insures with native Jupiter primitives — a flip neither product was designed for.
+          </p>
+          <div class="chips">
+            <span class="chip">yield → hedge</span>
+            <span class="chip">Lend × Prediction</span>
+            <span class="chip">no premium charged</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="soft" />
+
+      <h3>Definition of done — as shipped</h3>
+      <table>
+        <thead>
+          <tr><th>Goal</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>User can deposit USDC via connected wallet</td><td><span style="color:var(--positive)">✓ live-tested 4×</span></td></tr>
+          <tr><td>Vault deposits to Jupiter Lend Earn automatically</td><td><span style="color:var(--positive)">✓ $19.75 in jlUSDC</span></td></tr>
+          <tr><td>Rebalance loop runs end-to-end on real mainnet</td><td><span style="color:var(--positive)">✓ cron + admin trigger</span></td></tr>
+          <tr><td>5 hedges open across diverse tail-risk markets</td><td><span style="color:var(--warn)">⚠ 1 hedge — TVL × $5 minimum constraint (DX-GAP-#24)</span></td></tr>
+          <tr><td>Depositor sees share, P&amp;L, withdrawable</td><td><span style="color:var(--positive)">✓ /me page · DX-GAP-#28 fix</span></td></tr>
+          <tr><td>DX log publicly readable, rolled into DX-REPORT</td><td><span style="color:var(--positive)">✓ /dx page + 31 findings</span></td></tr>
+          <tr><td>Deployed app + demo video</td><td><span class="muted">— pending final pass</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ============== FOOTER ============== -->
+    <footer>
+      <span>
+        Ballast · Solana mainnet ·
+        <a href="https://solscan.io/account/B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7">B6Mt…2zsX</a>
+      </span>
+      <span class="mono">Generated 2026-05-08</span>
+    </footer>
+
+  </div>
+</body>
+</html>

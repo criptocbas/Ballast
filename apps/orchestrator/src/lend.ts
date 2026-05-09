@@ -1,13 +1,9 @@
 import { Client as LendReadClient } from '@jup-ag/lend-read';
 import { getDepositIxs, getWithdrawIxs } from '@jup-ag/lend/earn';
-import {
-  PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-  type TransactionInstruction,
-} from '@solana/web3.js';
+import { PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import BN from 'bn.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
+import { buildSimSignSendConfirmV0 } from './tx.js';
 
 /**
  * Jupiter Lend Earn helpers used by the rebalance loop.
@@ -172,50 +168,15 @@ export async function depositUsdcToLendEarn(
     throw new Error('Lend SDK returned zero deposit instructions');
   }
 
-  const latest = await connection.getLatestBlockhash('confirmed');
-  const message = new TransactionMessage({
-    payerKey: wallet.publicKey,
-    recentBlockhash: latest.blockhash,
-    instructions: ixs,
-  }).compileToV0Message();
-
-  const tx = new VersionedTransaction(message);
-
-  // Simulate before signing — if anything's wrong, we want to know now.
-  const sim = await connection.simulateTransaction(tx, {
-    sigVerify: false,
-    replaceRecentBlockhash: true,
+  const signatureOrSim = await buildSimSignSendConfirmV0({
+    conn: connection,
+    signer: wallet.keypair,
+    payer: wallet.publicKey,
+    ixs,
+    ...(options.simulateOnly ? { simulateOnly: true as const } : {}),
   });
-  if (sim.value.err) {
-    throw new Error(
-      `Lend deposit simulation failed: ${JSON.stringify(sim.value.err)}\nLogs: ${(sim.value.logs ?? []).join('\n')}`,
-    );
-  }
 
-  if (options.simulateOnly) {
-    return {
-      signature: '(simulated)',
-      amountUsdc,
-      vaultAddress: wallet.pubkeyBase58,
-    };
-  }
-
-  tx.sign([wallet.keypair]);
-  const signature = await connection.sendTransaction(tx, {
-    skipPreflight: false,
-    maxRetries: 3,
-    preflightCommitment: 'confirmed',
-  });
-  await connection.confirmTransaction(
-    {
-      signature,
-      blockhash: latest.blockhash,
-      lastValidBlockHeight: latest.lastValidBlockHeight,
-    },
-    'confirmed',
-  );
-
-  return { signature, amountUsdc, vaultAddress: wallet.pubkeyBase58 };
+  return { signature: signatureOrSim, amountUsdc, vaultAddress: wallet.pubkeyBase58 };
 }
 
 /**
@@ -244,43 +205,13 @@ export async function withdrawUsdcFromLendEarn(
     throw new Error('Lend SDK returned zero withdraw instructions');
   }
 
-  const latest = await connection.getLatestBlockhash('confirmed');
-  const message = new TransactionMessage({
-    payerKey: wallet.publicKey,
-    recentBlockhash: latest.blockhash,
-    instructions: ixs,
-  }).compileToV0Message();
-
-  const tx = new VersionedTransaction(message);
-
-  const sim = await connection.simulateTransaction(tx, {
-    sigVerify: false,
-    replaceRecentBlockhash: true,
+  const signature = await buildSimSignSendConfirmV0({
+    conn: connection,
+    signer: wallet.keypair,
+    payer: wallet.publicKey,
+    ixs,
+    ...(options.simulateOnly ? { simulateOnly: true as const } : {}),
   });
-  if (sim.value.err) {
-    throw new Error(
-      `Lend withdraw simulation failed: ${JSON.stringify(sim.value.err)}\nLogs: ${(sim.value.logs ?? []).join('\n')}`,
-    );
-  }
-
-  if (options.simulateOnly) {
-    return { signature: '(simulated)', amountUsdc, vaultAddress: wallet.pubkeyBase58 };
-  }
-
-  tx.sign([wallet.keypair]);
-  const signature = await connection.sendTransaction(tx, {
-    skipPreflight: false,
-    maxRetries: 3,
-    preflightCommitment: 'confirmed',
-  });
-  await connection.confirmTransaction(
-    {
-      signature,
-      blockhash: latest.blockhash,
-      lastValidBlockHeight: latest.lastValidBlockHeight,
-    },
-    'confirmed',
-  );
 
   return { signature, amountUsdc, vaultAddress: wallet.pubkeyBase58 };
 }

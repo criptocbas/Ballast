@@ -28,7 +28,7 @@ export default function AboutPage() {
       <Section title="What Ballast does">
         <p>
           Depositors send USDC to a vault wallet. The vault deposits the USDC into Jupiter Lend
-          Earn (currently jlUSDC at ~4.36% APY). On every rebalance tick, the vault withdraws the
+          Earn (currently jlUSDC at ~4.24% APY). On every rebalance tick, the vault withdraws the
           accrued yield and uses a configurable fraction of it to buy NO contracts on a curated
           basket of tail-risk prediction markets — BTC drawdowns, macro shocks, depeg events. If a
           hedged event resolves YES, the prediction-market payout sweeps back to the vault and is
@@ -63,7 +63,7 @@ export default function AboutPage() {
           </ExternalLink>{' '}
           and in{' '}
           <ExternalLink
-            href="https://github.com/criptocbas/Reflux/tree/main/docs/dx-log"
+            href="https://github.com/criptocbas/Ballast/tree/main/docs/dx-log"
             className="inline"
           >
             docs/dx-log/

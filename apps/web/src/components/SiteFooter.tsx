@@ -11,7 +11,7 @@ export function SiteFooter() {
         </div>
         <div className="flex items-center gap-5">
           <Link
-            href="https://github.com/criptocbas/Reflux"
+            href="https://github.com/criptocbas/Ballast"
             className="hover:text-fg transition-colors"
             target="_blank"
             rel="noreferrer"

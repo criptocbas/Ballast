@@ -2,20 +2,20 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cron from 'node-cron';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from './db/index.js';
-import { hedges as hedgesTable, yieldWithdrawals } from './db/schema.js';
+import { hedges as hedgesTable, vaultState, yieldWithdrawals } from './db/schema.js';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import {
   readUsdcEarnPosition,
   depositUsdcToLendEarn,
   withdrawUsdcFromLendEarn,
-  USDC_MINT,
 } from './lend.js';
 import { getJupiterClients } from './jupiter.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
+import { fetchVaultUsdcBalance } from './balances.js';
 import { openHedgeOrder, listVaultPositions } from './prediction.js';
 import { runClaimSweep } from './claimer.js';
 import { getTotalContributed } from './accountant.js';
@@ -75,11 +75,33 @@ export function loadBasket(): Basket {
   return cachedBasket;
 }
 
-// Last-tick gate. We persist this to SQLite via a sentinel hedge row? No —
-// simpler: keep in-memory + reload from the most recent hedge.openedAt as
-// a soft floor. For v1 the in-memory gate is fine; if the orchestrator restarts
-// inside the cooldown the next tick proceeds, which is acceptable.
-let lastTickStartedAt = 0;
+// Last-tick gate is persisted in the `vault_state` table so that an orchestrator
+// restart inside the cooldown window does NOT bypass the gate — that would let a
+// crash-loop fire repeated yield withdrawals against Lend Earn. Read on every
+// tick start, write on every tick start.
+const COOLDOWN_KEY = 'rebalance.last_tick_started_at_ms';
+
+function loadLastTickStartedAt(): number {
+  const row = getDb()
+    .select()
+    .from(vaultState)
+    .where(eq(vaultState.key, COOLDOWN_KEY))
+    .get();
+  if (!row) return 0;
+  const n = Number(row.value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function saveLastTickStartedAt(ms: number): void {
+  getDb()
+    .insert(vaultState)
+    .values({ key: COOLDOWN_KEY, value: String(ms), updatedAt: ms })
+    .onConflictDoUpdate({
+      target: vaultState.key,
+      set: { value: String(ms), updatedAt: ms },
+    })
+    .run();
+}
 
 const DEFAULT_MIN_INTERVAL_MS = 60 * 60 * 1000; // 1 hour cooldown by default
 
@@ -141,13 +163,18 @@ export async function runRebalanceTick(options: RebalanceOptions = {}): Promise<
   const startedAt = Date.now();
   const minInterval = options.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS;
 
+  const lastTickStartedAt = loadLastTickStartedAt();
   if (minInterval > 0 && startedAt - lastTickStartedAt < minInterval) {
     return shortCircuit({
       startedAt,
       reason: `Cooldown: last tick ran ${Math.floor((startedAt - lastTickStartedAt) / 1000)}s ago`,
     });
   }
-  lastTickStartedAt = startedAt;
+  // Persist immediately, before any side effects, so a crash mid-tick still
+  // honors the cooldown on the next process boot.
+  if (!options.dryRun) {
+    saveLastTickStartedAt(startedAt);
+  }
 
   const cfg = loadConfig();
   const basket = loadBasket();
@@ -442,24 +469,13 @@ function round6(n: number): number {
   return Math.round(n * 1_000_000) / 1_000_000;
 }
 
-async function fetchVaultUsdcBalance(): Promise<number> {
-  const wallet = getVaultWallet();
-  const conn = getSolanaConnection();
-  const { getAssociatedTokenAddress, getAccount } = await import('@solana/spl-token');
-  const ata = await getAssociatedTokenAddress(USDC_MINT, wallet.publicKey);
-  try {
-    const acct = await getAccount(conn, ata);
-    return Number(acct.amount) / 1_000_000;
-  } catch {
-    return 0;
-  }
-}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
 let cronTask: ReturnType<typeof cron.schedule> | undefined;
+let withdrawalCronTask: ReturnType<typeof cron.schedule> | undefined;
 
 /**
  * Schedule the rebalance loop using REBALANCE_CRON. Safe to call multiple times —
@@ -494,6 +510,51 @@ export function scheduleRebalanceCron(): void {
 export function stopRebalanceCron(): void {
   cronTask?.stop();
   cronTask = undefined;
+}
+
+/**
+ * Schedule a fast withdrawal-settlement loop independent of the rebalance cron.
+ * The rebalance cron also processes withdrawals (best-effort, latency-bounded by
+ * REBALANCE_CRON), but for depositor experience we want a tighter cadence —
+ * pending → sent in minutes, not up-to-24h. Default cadence: every 10 minutes.
+ */
+export function scheduleWithdrawalCron(): void {
+  const cfg = loadConfig();
+  if (!cron.validate(cfg.WITHDRAWAL_PROCESS_CRON)) {
+    log.warn(
+      { cron: cfg.WITHDRAWAL_PROCESS_CRON },
+      'WITHDRAWAL_PROCESS_CRON failed cron.validate — withdrawal worker NOT scheduled',
+    );
+    return;
+  }
+  withdrawalCronTask?.stop();
+  withdrawalCronTask = cron.schedule(
+    cfg.WITHDRAWAL_PROCESS_CRON,
+    () => {
+      // Lazy import to avoid a circular module-load between rebalance and withdrawals.
+      void import('./withdrawals.js')
+        .then(async ({ processPendingWithdrawals }) => {
+          const result = await processPendingWithdrawals();
+          if (result.attempted > 0) {
+            log.info(result, 'Withdrawal worker tick');
+          }
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          log.error({ err: message }, 'Withdrawal worker threw');
+        });
+    },
+    { timezone: 'UTC' } as Parameters<typeof cron.schedule>[2],
+  );
+  log.info(
+    { cron: cfg.WITHDRAWAL_PROCESS_CRON, timezone: 'UTC' },
+    'Withdrawal worker cron scheduled',
+  );
+}
+
+export function stopWithdrawalCron(): void {
+  withdrawalCronTask?.stop();
+  withdrawalCronTask = undefined;
 }
 
 /** Inspector: most recent persisted hedge rows, newest-first. */

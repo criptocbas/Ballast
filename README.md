@@ -1,9 +1,10 @@
 # Ballast
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-43%20passing-success)](#quality-gates)
+[![Tests](https://img.shields.io/badge/tests-52%20passing-success)](#quality-gates)
 [![Solana](https://img.shields.io/badge/Solana-mainnet-9945FF)](https://solscan.io/account/B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7)
 [![Hackathon](https://img.shields.io/badge/Frontier_Hackathon-Jupiter_sidetrack-F59E0B)](https://superteam.fun/earn/hackathon/frontier)
+[![Upstream PR](https://img.shields.io/badge/upstream_PR-jup--ag%2Fagent--skills%2320-blueviolet)](https://github.com/jup-ag/agent-skills/pull/20)
 
 > A USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets. The yield is the premium engine; the hedges are the ballast that keeps depositors stable when crypto markets storm.
 
@@ -29,9 +30,9 @@ Jupiter's rubric weights this submission across four buckets. We treat each as a
 
 | Weight | Deliverable | Where |
 |---|---|---|
-| **35%** | DX report | [`DX-REPORT.md`](./DX-REPORT.md) — 27 concrete findings on the Jupiter APIs / SDKs we touched, each with the specific endpoint, why it matters, and a suggested Monday-morning fix. |
+| **35%** | DX report | [`DX-REPORT.md`](./DX-REPORT.md) — 31 concrete findings on the Jupiter APIs / SDKs we touched, each with the specific endpoint, why it matters, and a suggested Monday-morning fix. Findings #28–#32 are field reports from real production incidents during the build, plus one finding upstreamed as a PR ([jup-ag/agent-skills#20](https://github.com/jup-ag/agent-skills/pull/20)). |
 | **25%** | AI Stack feedback | [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md) — per-tool analysis (Skills × 2, CLI, MCP, llms.txt) with what worked, what misled, file:line receipts, scores, and a top-5 prioritized recommendation list. |
-| **25%** | Technical execution | This repo — live on Solana mainnet, 43 passing tests, end-to-end deposit / withdraw / rebalance / claim flow, sign-message auth, admin-gated mutations, auto-deposit-recovery watcher. See [Live state](#live-state) and [How to run](#how-to-run). |
+| **25%** | Technical execution | This repo — live on Solana mainnet, 52 passing tests, end-to-end deposit / withdraw / rebalance / claim flow, sign-message auth, admin-gated mutations, auto-deposit-recovery watcher, persistent-state robustness layer (cooldown, RPC fallback, tx retry, rate limit). See [Live state](#live-state) and [How to run](#how-to-run). |
 | **15%** | Creativity & ambition | The composition itself — yield → hedge, Lend × Prediction, an insurance vault that self-insures with native Jupiter primitives. See [Why this is "oh"](#why-this-is-oh). |
 
 Companion materials: [`docs/dx-log/`](./docs/dx-log/) (raw friction log, captured during build), [`docs/demo-script.md`](./docs/demo-script.md) (90-second demo walkthrough), and the orchestrator's `/dx/observations` endpoint (live Jupiter API call feed, surfaced at the public `/dx` page).
@@ -43,8 +44,9 @@ Companion materials: [`docs/dx-log/`](./docs/dx-log/) (raw friction log, capture
 As of the last commit, the vault is operational on Solana mainnet:
 
 - **Vault wallet:** [`B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7`](https://solscan.io/account/B6MtVeqn7BrJ8HTX6CeP8VugNWyCqqbfcDMxYBknzPt7)
-- **Lend Earn position:** $1.00 in `jlUSDC` ([first-deposit tx](https://solscan.io/tx/4dKhnE1s5GGzidZ4v6h17P23D9FQyruya6viRDX2Yr9pUdYs8kTfT79LgCswhukeJnkzYh9DASk8t6c61rAA9R5M))
-- **Open hedge:** 26 NO contracts on *BTC > $80k by EOY 2026* ([first-hedge tx](https://solscan.io/tx/3vCCfi3CZ3fZUrXVucz2P4MEPrp2v23cGtkvi6ZPeXUd1iMX2FvUiJThu24vgQQ6fV9k4n8xqMPcC9TYPGPvS5HS))
+- **Lend Earn position:** ~$19.75 in `jlUSDC` at ~4.24% APY ([first deposit](https://solscan.io/tx/4dKhnE1s5GGzidZ4v6h17P23D9FQyruya6viRDX2Yr9pUdYs8kTfT79LgCswhukeJnkzYh9DASk8t6c61rAA9R5M), 2026-05-01)
+- **Open hedge:** 16 NO contracts on POLY-1345531 (*BTC > $90k by EOY 2026*), cost basis $5.12, mark ~$4.96 ([opening tx](https://solscan.io/tx/5JKzdxci3jskXW6XqhskJ1fEu6A9Cw38y82a81TUY6WJ99Fzea3GXUmSdczf2Bc5F3fiezHgmpBohMkqfzY5dqbL), 2026-05-07)
+- **Earlier hedge (now closed):** 26 NO contracts on POLY-1345530 (*BTC > $80k by EOY 2026*, $4.73 cost basis), placed 2026-05-02 ([opening tx](https://solscan.io/tx/3vCCfi3CZ3fZUrXVucz2P4MEPrp2v23cGtkvi6ZPeXUd1iMX2FvUiJThu24vgQQ6fV9k4n8xqMPcC9TYPGPvS5HS)) — market resolved as BTC crossed $80k during the build. See [DX-GAP-#31](./DX-REPORT.md) for the field report on `/markets/{id}` field-name + nullability conventions.
 
 ---
 
@@ -101,8 +103,11 @@ pnpm --filter @ballast/orchestrator exec tsx src/scripts/depositToLend.ts 1 --dr
 # Discover live "Up or Down" markets for an asset
 pnpm --filter @ballast/orchestrator exec tsx src/scripts/findMarket.ts Bitcoin
 
-# Open a NO-contract hedge on a specific market (--dry-run simulates first)
-pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts POLY-1345530 5 --dry-run
+# Open a NO-contract hedge on a specific market (--dry-run simulates first).
+# (POLY-1345531 was tradeable as of 2026-05-07 — use findMarket.ts above to
+#  discover currently-open markets, since binary markets resolve and become
+#  unreplaceable. See DX-GAP-#31 in DX-REPORT.md.)
+pnpm --filter @ballast/orchestrator exec tsx src/scripts/openHedge.ts POLY-1345531 5 --dry-run
 ```
 
 ### 4) Manual rebalance + claim during demos
@@ -151,7 +156,7 @@ POST /api/withdrawals/request  signed withdrawal (settles inline if possible)
 
 ```bash
 pnpm typecheck      # all packages
-pnpm test           # vitest: 43 tests — shared (unit conversions), accountant (share math),
+pnpm test           # vitest: 52 tests — shared (unit conversions), accountant (share math + withdrawable),
                     # distribution (pro-rata payouts), nonces (sign-message + replay protection),
                     # rebalance (cooldown / preview), deposit-watcher (PDA classification +
                     # SPL transfer parsing)
@@ -161,10 +166,6 @@ pnpm --filter @ballast/web run build   # production Next.js build
 All passing on `main`.
 
 ---
-
-## Notes on the name
-
-This repo is `criptocbas/Reflux` — the project's working name during early scoping. The product name landed at **Ballast** during design review (`reflux.finance` was taken, the first Google result for "Reflux" is a medical condition, and "Ballast" has a metaphor that explains the product in one word). The GitHub URL is kept as a small origin-story Easter egg; everything else — workspace name, packages (`@ballast/*`), database, branding — is Ballast. See [`docs/brand.md`](./docs/brand.md) for the full brand decision.
 
 ## License
 

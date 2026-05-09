@@ -1,9 +1,4 @@
-import {
-  PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-  type TransactionInstruction,
-} from '@solana/web3.js';
+import { PublicKey, type TransactionInstruction } from '@solana/web3.js';
 import {
   createAssociatedTokenAccountInstruction,
   createTransferCheckedInstruction,
@@ -15,8 +10,10 @@ import { getDb } from './db/index.js';
 import { withdrawals } from './db/schema.js';
 import { getSolanaConnection, getVaultWallet } from './wallet.js';
 import { USDC_MINT, withdrawUsdcFromLendEarn } from './lend.js';
-import { getDepositorNetBalance, queueWithdrawal } from './accountant.js';
+import { getDepositorWithdrawable, queueWithdrawal } from './accountant.js';
+import { fetchVaultRedeemableUsdc } from './balances.js';
 import { createLogger } from './logger.js';
+import { buildSimSignSendConfirmV0 } from './tx.js';
 
 const log = createLogger('withdrawals');
 
@@ -60,10 +57,21 @@ export async function requestWithdrawal(args: {
     throw new WithdrawalError(`Invalid Solana pubkey: ${args.wallet}`, 'wallet_invalid');
   }
 
-  const balance = getDepositorNetBalance(args.wallet);
-  if (args.amountUsdc > balance.net) {
+  // Validate against *honest* withdrawable, not just notional net. Notional says
+  // "you're owed $X"; withdrawable says "the vault can actually pay $Y right now"
+  // where Y can be lower if some of the principal is locked in hedges. We enforce
+  // the lower of the two so the request never reaches simulation if it would be
+  // unfulfillable. See DX-GAP-#28 for the field report on why this matters.
+  const redeemable = await fetchVaultRedeemableUsdc().catch(() => 0);
+  const withdrawable = getDepositorWithdrawable({
+    wallet: args.wallet,
+    redeemableVaultUsdc: redeemable,
+  });
+  if (args.amountUsdc > withdrawable.withdrawableNow + 1e-6) {
     throw new WithdrawalError(
-      `Withdraw amount $${args.amountUsdc.toFixed(4)} exceeds net balance $${balance.net.toFixed(4)} (contributed $${balance.contributed.toFixed(4)} - withdrawn $${balance.withdrawn.toFixed(4)} + payouts $${balance.payouts.toFixed(4)})`,
+      `Withdraw amount $${args.amountUsdc.toFixed(4)} exceeds withdrawable now $${withdrawable.withdrawableNow.toFixed(4)} ` +
+        `(notional $${withdrawable.notionalNet.toFixed(4)}, of which $${withdrawable.hedgeLockedUsdc.toFixed(4)} is locked in open hedges; ` +
+        `vault redeemable $${withdrawable.redeemableVaultUsdc.toFixed(4)} × your share ${(withdrawable.shareFraction * 100).toFixed(2)}%)`,
       'insufficient_balance',
     );
   }
@@ -97,11 +105,17 @@ export async function trySettleWithdrawal(
     .get();
   if (!row) return { settled: false, reason: 'Withdrawal not found or not pending' };
 
-  // Mark processing — soft lock against double-settlement attempts.
-  db.update(withdrawals)
+  // Atomic soft-lock — only the worker that wins the conditional UPDATE proceeds.
+  // Required now that the rebalance cron and the dedicated withdrawal cron can
+  // both call into trySettleWithdrawal concurrently.
+  const lock = db
+    .update(withdrawals)
     .set({ status: 'processing' })
     .where(and(eq(withdrawals.id, withdrawalId), eq(withdrawals.status, 'pending')))
     .run();
+  if (lock.changes === 0) {
+    return { settled: false, reason: 'Withdrawal already being processed by another worker' };
+  }
 
   try {
     const wallet = getVaultWallet();
@@ -150,39 +164,13 @@ export async function trySettleWithdrawal(
       ),
     );
 
-    const latest = await conn.getLatestBlockhash('confirmed');
-    const message = new TransactionMessage({
-      payerKey: wallet.publicKey,
-      recentBlockhash: latest.blockhash,
-      instructions: ixs,
-    }).compileToV0Message();
-    const tx = new VersionedTransaction(message);
-
-    // 3) Simulate before signing
-    const sim = await conn.simulateTransaction(tx, {
-      sigVerify: false,
-      replaceRecentBlockhash: true,
+    // 3) Build, simulate, sign, send, confirm — with blockhash-expiry retry.
+    const signature = await buildSimSignSendConfirmV0({
+      conn,
+      signer: wallet.keypair,
+      payer: wallet.publicKey,
+      ixs,
     });
-    if (sim.value.err) {
-      throw new Error(
-        `Withdrawal simulation failed: ${JSON.stringify(sim.value.err)}\nLogs:\n${(sim.value.logs ?? []).join('\n')}`,
-      );
-    }
-
-    tx.sign([wallet.keypair]);
-    const signature = await conn.sendRawTransaction(tx.serialize(), {
-      maxRetries: 3,
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
-    await conn.confirmTransaction(
-      {
-        signature,
-        blockhash: latest.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight,
-      },
-      'confirmed',
-    );
 
     db.update(withdrawals)
       .set({ status: 'sent', settledAt: Date.now(), txSignature: signature })

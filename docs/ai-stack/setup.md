@@ -85,7 +85,7 @@ jup predictions events --category crypto --filter live --limit 5 -f json
 
 In `predictions events --filter live` the CLI returns `yesPriceUsd: 0.43, noPriceUsd: null` for binary markets.
 
-For Reflux, where we systematically buy NO contracts, this means we have to:
+For Ballast, where we systematically buy NO contracts, this means we have to:
 1. Compute NO price as `1 - yesPriceUsd` (relying on the binary-mirror invariant)
 2. Or call `/markets/{id}` for every market to get the actual ask price
 

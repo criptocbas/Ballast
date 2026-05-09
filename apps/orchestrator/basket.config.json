@@ -1,32 +1,47 @@
 {
-  "$schema": "Curated tail-risk hedge basket for Ballast v1. Weights sum to 1.0. Each market is a Jupiter Prediction Market with NO-side ask < 0.5 (otherwise the hedge is too expensive to make sense at small order sizes).",
+  "$schema": "Curated tail-risk hedge basket. Weights sum to 1.0. NOTE: temporarily compressed to a single-market basket for the live submission demo because the original 5-market basket × $5 Jupiter Prediction minimum × small TVL meant no market cleared the per-weight order minimum (DX-GAP-#24 in production). The original 5-market config is preserved below in `_inactive_diversified_basket_NEEDS_RECURATION` — DO NOT restore as-is: 3 of the 5 markets had resolved/closed by 2026-05-07. See per-entry status notes. Re-curate before re-enabling.",
   "minOrderSizeUsd": 5.0,
   "minOrderbookDepthUsd": 2.0,
   "markets": [
     {
-      "marketId": "POLY-1345530",
-      "weight": 0.35,
-      "thesis": "BTC > $80k by EOY 2026 — buying NO is a hedge against a deep crypto drawdown."
-    },
-    {
-      "marketId": "POLY-573656",
-      "weight": 0.25,
-      "thesis": "BTC > $150k by EOY 2026 — buying NO at low premium ($0.11) reflects most of the downside without large capital lockup."
-    },
-    {
       "marketId": "POLY-1345531",
-      "weight": 0.20,
-      "thesis": "BTC > $90k by EOY 2026 — closer-to-spot bullish strike; NO at ~$0.46 prices the market roughly even."
-    },
-    {
-      "marketId": "POLY-2113926-0",
-      "weight": 0.10,
-      "thesis": "Short-dated daily Up/Down for ETH — small allocation to test rapid resolution + claim flow during demos. Replace with the next live market when this one resolves."
-    },
-    {
-      "marketId": "POLY-2113925-0",
-      "weight": 0.10,
-      "thesis": "Short-dated daily Up/Down for BTC — same role as the ETH one."
+      "weight": 1.0,
+      "thesis": "BTC > $90k by EOY 2026 — buying NO is a hedge against a deep crypto drawdown. Closer-to-spot strike than the original POLY-1345530 which has since resolved (BTC crossed $80k during the build, see DX-REPORT history note). NO ask ~$0.32 makes the hedge math attractive: $5.12 cost basis → 16 NO contracts → ~$16 payout if BTC resolves below $90k. Single-market demo basket; full diversified basket preserved in _inactive_diversified_basket_NEEDS_RECURATION for v1.5 (needs market re-curation before restore)."
     }
-  ]
+  ],
+  "_inactive_diversified_basket_NEEDS_RECURATION": {
+    "_warning": "DO NOT restore this basket as-is. Probed 2026-05-07 against `GET /prediction/v1/markets/{id}`: 3 of 5 markets are now `status: closed` and will return 400 'No shares available at this price' on order placement (DX-GAP-#21 / #31). Replace closed markets with currently-tradeable equivalents before re-enabling. Run `pnpm --filter @ballast/orchestrator exec tsx src/scripts/findMarket.ts Bitcoin` to discover live candidates.",
+    "markets": [
+      {
+        "marketId": "POLY-1345530",
+        "weight": 0.35,
+        "thesis": "BTC > $80k by EOY 2026 — original hedge target.",
+        "_status_2026-05-07": "CLOSED — BTC crossed $80k during the build; market resolved. Replace before restore."
+      },
+      {
+        "marketId": "POLY-573656",
+        "weight": 0.25,
+        "thesis": "BTC > $150k by EOY 2026 — buying NO at low premium reflects most of the downside without large capital lockup.",
+        "_status_2026-05-07": "OPEN — but NO ask is $0.91 (very expensive); poor hedge math. YES at $0.11 implies 89% confidence BTC won't hit $150k. Reconsider thesis or replace."
+      },
+      {
+        "marketId": "POLY-1345531",
+        "weight": 0.20,
+        "thesis": "BTC > $90k by EOY 2026 — closer-to-spot bullish strike.",
+        "_status_2026-05-07": "OPEN with NO at $0.32 — viable. This is the market we promoted to weight 1.0 in the active demo basket."
+      },
+      {
+        "marketId": "POLY-2113926-0",
+        "weight": 0.10,
+        "thesis": "Short-dated daily Up/Down for ETH — small allocation to test rapid resolution + claim flow during demos.",
+        "_status_2026-05-07": "CLOSED (closeTime ~April 2026). Daily markets resolve fast; replace with the next live market when re-enabling."
+      },
+      {
+        "marketId": "POLY-2113925-0",
+        "weight": 0.10,
+        "thesis": "Short-dated daily Up/Down for BTC — same role as the ETH one.",
+        "_status_2026-05-07": "CLOSED (closeTime ~April 2026). Same fix as the ETH daily."
+      }
+    ]
+  }
 }

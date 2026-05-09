@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, ne, sql } from 'drizzle-orm';
 import { claimDistributions, deposits, depositors, withdrawals } from './db/schema.js';
 import { getDb } from './db/index.js';
 
@@ -211,7 +211,13 @@ export function getDepositorClaimTotal(wallet: string): number {
 }
 
 /**
- * Net depositor balance: contributed principal − settled withdrawals + payout entitlements.
+ * Net depositor balance: contributed principal − live withdrawals + payout entitlements.
+ *
+ * "Live" means status in (pending, processing, sent). Failed withdrawals do NOT
+ * count — when a settlement attempt aborts at simulation, no funds leave the
+ * vault, so the depositor's balance must NOT be reduced. We surfaced this exact
+ * bug during the build (a failed simulation row was leaking $8 from the
+ * depositor's notional balance) — see DX-GAP-#28 in DX-REPORT.md.
  */
 export function getDepositorNetBalance(wallet: string): {
   contributed: number;
@@ -224,7 +230,9 @@ export function getDepositorNetBalance(wallet: string): {
   const withdrawnRow = db
     .select({ total: sql<number>`coalesce(sum(${withdrawals.amountUsdc}), 0)` })
     .from(withdrawals)
-    .where(eq(withdrawals.depositorWallet, wallet))
+    .where(
+      sql`${withdrawals.depositorWallet} = ${wallet} AND ${withdrawals.status} != 'failed'`,
+    )
     .get();
   const withdrawn = Number(withdrawnRow?.total ?? 0);
   const payouts = getDepositorClaimTotal(wallet);
@@ -233,5 +241,83 @@ export function getDepositorNetBalance(wallet: string): {
     withdrawn,
     payouts,
     net: contributed - withdrawn + payouts,
+  };
+}
+
+/**
+ * Sum of every depositor's net notional balance — the total claim against the
+ * vault. Used to compute share fractions for the *redeemable* model: each
+ * depositor's right to liquid vault assets is `theirNet / totalNet`.
+ */
+export function getTotalNetBalance(): number {
+  const db = getDb();
+  const totalContributedRow = db
+    .select({ total: sql<number>`coalesce(sum(${deposits.amountUsdc}), 0)` })
+    .from(deposits)
+    .get();
+  const totalContributed = Number(totalContributedRow?.total ?? 0);
+
+  const totalWithdrawnRow = db
+    .select({ total: sql<number>`coalesce(sum(${withdrawals.amountUsdc}), 0)` })
+    .from(withdrawals)
+    .where(ne(withdrawals.status, 'failed'))
+    .get();
+  const totalWithdrawn = Number(totalWithdrawnRow?.total ?? 0);
+
+  const totalPayoutsRow = db
+    .select({ total: sql<number>`coalesce(sum(${claimDistributions.amountUsd}), 0)` })
+    .from(claimDistributions)
+    .get();
+  const totalPayouts = Number(totalPayoutsRow?.total ?? 0);
+
+  return totalContributed - totalWithdrawn + totalPayouts;
+}
+
+export interface DepositorWithdrawable {
+  /** What the depositor's notional ledger says they're owed. */
+  notionalNet: number;
+  /** Their share of the total net claim, in [0, 1]. */
+  shareFraction: number;
+  /** Vault USDC immediately payable: wallet free + Lend Earn underlying. */
+  redeemableVaultUsdc: number;
+  /** shareFraction × redeemableVaultUsdc — their slice of liquid vault assets. */
+  shareOfRedeemable: number;
+  /** What they can actually withdraw right now: `min(notional, share-of-redeemable)`. */
+  withdrawableNow: number;
+  /** Notional minus withdrawableNow — capital locked in non-instant-redeemable positions. */
+  hedgeLockedUsdc: number;
+}
+
+/**
+ * Compute a depositor's *honestly* withdrawable balance. The notional ledger
+ * (contributed − withdrawn + payouts) describes what they're owed; this
+ * function clamps that to what the vault can actually pay out *now*, given
+ * its current redeemable USDC. The difference is "hedge-locked" capital —
+ * USDC that left the vault for Prediction positions and won't return until
+ * those positions resolve (or are closed at fee + slippage cost).
+ *
+ * This is the production fix for DX-GAP-#28 — see DX-REPORT.md for the field
+ * report on shipping a vault on Lend Earn and discovering, in production,
+ * that cumulative-deposit accounting promises depositors balances the vault
+ * cannot honor the moment any capital flows into hedges.
+ */
+export function getDepositorWithdrawable(args: {
+  wallet: string;
+  redeemableVaultUsdc: number;
+}): DepositorWithdrawable {
+  const notionalNet = Math.max(0, getDepositorNetBalance(args.wallet).net);
+  const totalNet = Math.max(0, getTotalNetBalance());
+  const redeemable = Math.max(0, args.redeemableVaultUsdc);
+  const shareFraction = totalNet > 0 ? notionalNet / totalNet : 0;
+  const shareOfRedeemable = shareFraction * redeemable;
+  const withdrawableNow = Math.min(notionalNet, shareOfRedeemable);
+  const hedgeLockedUsdc = Math.max(0, notionalNet - withdrawableNow);
+  return {
+    notionalNet,
+    shareFraction,
+    redeemableVaultUsdc: redeemable,
+    shareOfRedeemable,
+    withdrawableNow,
+    hedgeLockedUsdc,
   };
 }

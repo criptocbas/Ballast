@@ -2,7 +2,7 @@
 
 **Submission for:** Jupiter "Not Your Regular Bounty" sidetrack · Solana Frontier Hackathon
 **Project:** Ballast — a USDC vault where Jupiter Lend yield finances NO-contract hedges on tail-risk prediction markets
-**Repo:** https://github.com/criptocbas/Reflux
+**Repo:** https://github.com/criptocbas/Ballast
 **Email tied to Developer Platform:** sebastianbarrientosa@gmail.com
 **Companion document:** [`DX-REPORT.md`](../../DX-REPORT.md) — the API/SDK feedback. This doc is the AI-stack-specific complement.
 
@@ -18,15 +18,17 @@
 
 A working product on Solana mainnet was shipped (live deposits, live Lend position, live hedge, live withdrawals). The stack helped. It also got in the way in concrete, fixable places.
 
+**One AI-stack finding upstreamed.** The auth-tier overstatement we hit in `integrating-jupiter` SKILL.md (DX-GAP-#13) is now an open PR at [jup-ag/agent-skills#20](https://github.com/jup-ag/agent-skills/pull/20) — proposes a tiered auth description so agents reading the skill verbatim no longer fail-fast on missing keys for read-only exploration.
+
 ---
 
 ## Test conditions — what produced this signal
 
-**What we built (so the claims have weight).** Ballast is a custodial USDC vault with three on-chain integrations and an off-chain orchestrator:
+**What we built (so the claims have weight).** Ballast is a custodial USDC vault with three on-chain integrations and an off-chain orchestrator. Live state at submission time:
 
-- **Jupiter Lend Earn (jlUSDC)** — 1 live deposit at $1.00, ~4.36% APY ([Solscan tx](https://solscan.io/tx/4dKhnE1s5GGzidZ4v6h17P23D9FQyruya6viRDX2Yr9pUdYs8kTfT79LgCswhukeJnkzYh9DASk8t6c61rAA9R5M)).
-- **Jupiter Prediction Markets** — 1 live NO-contract hedge, 26 contracts on `POLY-1345530` ([Solscan tx](https://solscan.io/tx/3vCCfi3CZ3fZUrXVucz2P4MEPrp2v23cGtkvi6ZPeXUd1iMX2FvUiJThu24vgQQ6fV9k4n8xqMPcC9TYPGPvS5HS)).
-- **End-to-end depositor flow** — sign-message auth + SPL transfer + share accounting + auto-deposit-recovery + admin-gated withdrawal + claim sweeping. Live-tested with 3 deposits + 2 withdrawals across the build.
+- **Jupiter Lend Earn (jlUSDC)** — ~$19.75 deposited, ~4.24% APY ([first deposit Solscan, 2026-05-01](https://solscan.io/tx/4dKhnE1s5GGzidZ4v6h17P23D9FQyruya6viRDX2Yr9pUdYs8kTfT79LgCswhukeJnkzYh9DASk8t6c61rAA9R5M)).
+- **Jupiter Prediction Markets** — 1 open NO-contract hedge, 16 contracts on `POLY-1345531` ([opening tx Solscan, 2026-05-07](https://solscan.io/tx/5JKzdxci3jskXW6XqhskJ1fEu6A9Cw38y82a81TUY6WJ99Fzea3GXUmSdczf2Bc5F3fiezHgmpBohMkqfzY5dqbL)). An earlier hedge on `POLY-1345530` ([opening tx, 2026-05-02](https://solscan.io/tx/3vCCfi3CZ3fZUrXVucz2P4MEPrp2v23cGtkvi6ZPeXUd1iMX2FvUiJThu24vgQQ6fV9k4n8xqMPcC9TYPGPvS5HS)) closed during the build as BTC crossed $80k — DX-GAP-#31 in the report covers what we learned about market-state discovery from that.
+- **End-to-end depositor flow** — sign-message auth + SPL transfer + share accounting + auto-deposit-recovery + admin-gated withdrawal + claim sweeping. Live-tested with **4 deposits, 3 successful withdrawals, and 1 failed-and-correctly-rejected withdrawal** that surfaced DX-GAP-#28 (the "honest withdrawable" finding that became the headline).
 
 **What we used from the AI stack.** All four published components, install commands captured in [`docs/ai-stack/setup.md`](setup.md):
 
@@ -70,11 +72,13 @@ A working product on Solana mainnet was shipped (live deposits, live Lend positi
 **1. The "Auth: required" overstatement** — `SKILL.md:42` reads:
 > **Auth**: `x-api-key` from [portal.jup.ag](https://portal.jup.ag/) (**required for Jupiter REST endpoints**)
 
-The official docs (`https://dev.jup.ag/docs/llms.txt`, line 6) clearly state keyless access at 0.5 RPS works for many endpoints. We confirmed empirically: keyless works for `/events`, `/markets/{id}`, `/orderbook/{id}`, `/lend/v1/earn/tokens`. **An agent guided by the skill verbatim would fail-fast on a missing key during prototyping.** Skills are push-content; this kind of inaccuracy actively misleads. (Captured as DX-GAP-#13.)
+The official docs (`https://dev.jup.ag/docs/llms.txt`, line 6) clearly state keyless access at 0.5 RPS works for many endpoints. We confirmed empirically: keyless works for `/events`, `/markets/{id}`, `/orderbook/{id}`, `/lend/v1/earn/tokens`. **An agent guided by the skill verbatim would fail-fast on a missing key during prototyping.** Skills are push-content; this kind of inaccuracy actively misleads. (Captured as DX-GAP-#13.) **We upstreamed the fix as [jup-ag/agent-skills#20](https://github.com/jup-ag/agent-skills/pull/20) on 2026-05-07** — proposes a tiered auth description distinguishing keyless reads from authenticated writes. The PR is the only finding from this build we shipped as a code change to the AI stack itself; the rest of the recommendations live in this doc.
 
-**2. The composition gap** — neither skill has a "Compose with other Jupiter products" section. We were building Lend × Prediction (yield → hedge). The skill's `examples/lend.md` and the prediction guidance live in the same file but aren't linked as a *pattern*. Vault products on Lend are an entire shape (Kamino, Drift strategy products, every Drift-strategy product) — none of them are addressed.
+**2. The install command isn't headless-safe.** The documented `npx skills add jup-ag/agent-skills --skill "integrating-jupiter"` defaults to interactive prompts (agent selection, auto-accept). It hangs in CI / sandbox / non-TTY environments. The working command is `npx skills add jup-ag/agent-skills --skill integrating-jupiter --agent claude-code --yes`. (Captured as DX-GAP-#10.)
 
-**3. No stability tier per endpoint** — `integrating-jupiter` lists every Jupiter API family but doesn't differentiate `swap` (battle-tested) from `prediction` (pre-v1) from `studio` (alpha). Treating them all as equally-stable nudges agents to write production-bound code against unstable surfaces.
+**3. The composition gap** — neither skill has a "Compose with other Jupiter products" section. We were building Lend × Prediction (yield → hedge). The skill's `examples/lend.md` and the prediction guidance live in the same file but aren't linked as a *pattern*. Vault products on Lend are an entire shape (Kamino, Drift strategy products, every YieldFi-shape product) — none of them are addressed.
+
+**4. No stability tier per endpoint** — `integrating-jupiter` lists every Jupiter API family but doesn't differentiate `swap` (battle-tested) from `prediction` (pre-v1) from `studio` (alpha). Treating them all as equally-stable nudges agents to write production-bound code against unstable surfaces. (Captured as DX-GAP-#14.)
 
 ### What we'd add to this skill
 
@@ -307,14 +311,14 @@ Every example in every SKILL.md gets parsed, run against a sandbox `api-staging.
 | `llms.txt` | Loaded once at session start, referenced ~50 times via grep | Single biggest accelerator |
 | `llms-full.txt` | Loaded for ~5 deep-dive lookups | Useful but missing section anchors |
 
-**Total Jupiter API calls during the build (live data):** captured in the orchestrator's `dx_observations` table and surfaced at https://github.com/criptocbas/Reflux/tree/main/apps/web/src/app/dx (and the local `/dx` endpoint while running). Across 5 Jupiter API families and ~13 endpoints, all hit live on Solana mainnet.
+**Total Jupiter API calls during the build (live data):** captured in the orchestrator's `dx_observations` table and surfaced at https://github.com/criptocbas/Ballast/tree/main/apps/web/src/app/dx (and the local `/dx` endpoint while running). Across 5 Jupiter API families and ~13 endpoints, all hit live on Solana mainnet.
 
 ---
 
 ## Closing
 
-The Jupiter AI stack is competitive *because* it has all four legs (skills, CLI, MCP, llms.txt). No other DeFi platform on Solana has shipped this much agent-shaped tooling. The 12 numbered findings in this doc are mostly edges, not core defects.
+The Jupiter AI stack is competitive *because* it has all four legs (skills, CLI, MCP, llms.txt). No other DeFi platform on Solana has shipped this much agent-shaped tooling. The findings in this doc — nine cross-referenced DX-GAPs and five cross-cutting observations — are mostly edges, not core defects.
 
-The single biggest thing Jupiter could do is **promote the CLI's normalizers to a public package**. Doing so would fix the integration experience for everyone — direct-API users included — at the cost of a single sprint of refactoring. Beyond that, the skill-content accuracy work (auth tiers, composition section, stability markers) is all <1 day of editing and would meaningfully reduce the friction we hit.
+The single biggest thing Jupiter could do is **promote the CLI's normalizers to a public package**. Doing so would fix the integration experience for everyone — direct-API users included — at the cost of a single sprint of refactoring. Beyond that, the skill-content accuracy work (auth tiers, composition section, stability markers) is all <1 day of editing and would meaningfully reduce the friction we hit. The auth-tier piece is already an open PR at [jup-ag/agent-skills#20](https://github.com/jup-ag/agent-skills/pull/20).
 
 We'd build with this stack again. We'd recommend it to the next vault-shape team on Solana. And we'd lobby hard for `@jup-ag/api-client`.

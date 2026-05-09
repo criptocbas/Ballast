@@ -1,5 +1,5 @@
 /**
- * Server-side fetch helpers that talk to the Reflux orchestrator.
+ * Server-side fetch helpers that talk to the Ballast orchestrator.
  *
  * All calls run on the server (Next.js Server Components) so the orchestrator's
  * URL never has to be public and we keep API keys / observability hidden.
@@ -85,6 +85,20 @@ export interface DepositorMeResponse {
     withdrawn: number;
     payouts: number;
     net: number;
+  };
+  /**
+   * Honest withdrawable view — clamps the depositor's notional balance to what
+   * the vault can actually pay out right now (wallet USDC + Lend Earn). The
+   * difference (`hedgeLockedUsdc`) is capital locked in open Prediction
+   * positions that won't be liquid until those markets resolve.
+   * See DX-GAP-#28 in DX-REPORT.md for the field report on why this exists.
+   */
+  withdrawable: {
+    notionalNet: number;
+    withdrawableNow: number;
+    hedgeLockedUsdc: number;
+    shareFraction: number;
+    redeemableVaultUsdc: number;
   };
 }
 

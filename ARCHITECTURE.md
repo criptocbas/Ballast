@@ -1,7 +1,10 @@
 # Ballast — Architecture
 
-**Status:** v1 design (draft)
-**Captured:** 2026-04-30
+**Status:** v1 shipped on Solana mainnet — captured as a live design doc
+**Originally drafted:** 2026-04-30 (planning)
+**Last refreshed:** 2026-05-07 (post-build, reflects what actually shipped)
+
+> This doc started as a v1 design plan and was kept in sync as we built. Where the build deviates from the plan, the deviation is noted (and usually backed by a DX-REPORT finding that explains why). For the public-facing summary see [`README.md`](./README.md); for the depth on integration findings see [`DX-REPORT.md`](./DX-REPORT.md) and [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md).
 
 ---
 
@@ -84,11 +87,11 @@ For the hackathon scope, Ballast v1 is **explicitly custodial**:
 ## Asset choice
 
 **v1 deposit asset: USDC.**
-- Largest TVL on Jupiter Lend Earn ($414M)
-- 4.36% APY (3.23% supply + 1.13% rewards)
+- Largest TVL on Jupiter Lend Earn (~$437M at submission)
+- ~4.24% APY at submission (rate floats; was ~4.36% at planning time — captured in `dx-log/04-rebalance-economics.md`)
 - Most familiar to non-power-user depositors
 
-**v1.5 stretch: JUICED (jlJupUSD)** — 5.12% APY, plus signals "Jupiter-native" composition (depositing Jupiter's stablecoin into Jupiter's lender). Worth highlighting in the demo if we have time.
+**v1.5 stretch: JUICED (jlJupUSD)** — ~5% APY range, plus signals "Jupiter-native" composition (depositing Jupiter's stablecoin into Jupiter's lender). Surfaced on the `/vault` page rates table for any future depositor who wants the higher-yield asset; v1 keeps USDC for familiarity and price stability.
 
 ---
 
@@ -103,9 +106,13 @@ Candidate categories:
 4. **Geopolitical** — ceasefire-extension markets that affect global risk (correlated with crypto)
 
 Sizing algorithm (v1):
-1. Compute available premium budget = accrued yield since last rebalance × hedgeBudgetFraction (default 50%)
-2. Split budget equally across N markets in basket (default N=8)
-3. Place limit BUY NO orders sized to the per-market budget at current ask
+1. Compute available premium budget = accrued yield (or wallet inflows during rebalance) × `HEDGE_BUDGET_FRACTION` (default 50%)
+2. Walk the basket markets, allocate per-market budget = `hedgeBudget × weight`
+3. Skip any market where `allocation < $5` (Jupiter Prediction's documented minimum — DX-GAP-#18, #24)
+4. Skip any market the vault already holds a position in (no doubling-up in v1)
+5. Place a BUY NO order for each remaining allocation via `POST /prediction/v1/orders`
+
+**Deviation from original design:** the planned 5-market diversified basket (35/25/20/10/10 split) was compressed to a **single-market basket** for the live submission demo (POLY-1345531, BTC > $90k EOY 2026, weight 1.0). Reason: the original $5 minimum × small TVL economics meant no per-market allocation cleared the threshold (DX-GAP-#24 in production). The full diversified basket is preserved in `apps/orchestrator/basket.config.json` under `_inactive_diversified_basket_NEEDS_RECURATION` for v1.5 — the closed markets there need re-curation against current market state before restore.
 
 We deliberately keep this simple for v1. Sophistication = v2.
 
@@ -130,7 +137,7 @@ We deliberately keep this simple for v1. Sophistication = v2.
 |---|---|---|
 | Monorepo | pnpm workspaces | Standard, fast, no Turbo complexity needed |
 | Lang | TypeScript (strict) | Required for type-safe Jupiter API clients |
-| Frontend | Next.js 15 (App Router) | Server components for data-heavy pages |
+| Frontend | Next.js 16 (App Router) + Turbopack dev | Server components for data-heavy pages. **Note:** Next.js 16 has breaking changes vs LLM training data — see `apps/web/AGENTS.md`. |
 | Style | Tailwind v4 + shadcn/ui | Fast, professional defaults |
 | Orchestrator | Node 22 + TypeScript | Same language as frontend; easier reuse |
 | State store | SQLite + Drizzle ORM | File-based, zero-config, perfect for hackathon scale |
@@ -138,7 +145,9 @@ We deliberately keep this simple for v1. Sophistication = v2.
 | Jupiter SDK | `@jup-ag/lend`, `@jup-ag/lend-read` | Per Jupiter docs |
 | AI Stack | Jupiter CLI + Skills + Docs MCP | **Required for the AI Stack feedback category (25%)** — used during development |
 | Wallet | `@solana/wallet-adapter-react` | Standard Solana wallet adapter |
-| Test | Vitest | Modern, fast, TS-native |
+| Test | Vitest | Modern, fast, TS-native — 52 tests (6 shared + 46 orchestrator) at submission. |
+| Robustness | `node-cron` + `@fastify/rate-limit` + custom helpers in `tx.ts` / `balances.ts` | Persisted rebalance cooldown (`vault_state` SQLite table), decoupled withdrawal worker cron (`*/10 * * * *` with race-safe atomic soft-lock), multi-RPC fallback (`SOLANA_RPC_URL_FALLBACK` + `withRpcFallback` for read paths), `/api/me/:wallet` rate-limit, `/vault/info` cache bust on admin mutations, blockhash-expired retry helper for V0 transactions. The retry helper fired in production on 2026-05-07 — caught a real `TransactionExpiredBlockheightExceededError` on a $12.50 Lend deposit and recovered cleanly. Real-world validation. |
+| DX-GAP-#28 fix | `accountant.ts`, `balances.ts`, `withdrawals.ts`, `MePageClient.tsx` | Honest withdrawable computation: `min(notional, shareFraction × redeemableVaultUsdc)` where redeemable excludes hedge mark. Surfaced as "Withdrawable now" on `/me` with an amber callout when notional > redeemable. Side-fix: failed withdrawal rows no longer silently leak from depositor balances (filter `status != 'failed'`). |
 | Lint/format | ESLint + Prettier | Standard |
 
 ---
@@ -200,16 +209,19 @@ ballast/
 
 ---
 
-## What the AI Stack does for us (the 25% category)
+## What the AI Stack did for us (the 25% category)
 
-| AI tool | Where used | What we'll feedback on |
+The full per-tool analysis lives in [`docs/ai-stack/FEEDBACK.md`](./docs/ai-stack/FEEDBACK.md). Quick summary:
+
+| AI tool | Score | Headline |
 |---|---|---|
-| `@jup-ag/cli` | Orchestrator's hedge executor — spawn `jup` for order placement and verify behavior matches direct API | Telegram support, JSON output schema stability, error reporting clarity |
-| Jupiter Skills (`integrating-jupiter`, `jupiter-lend`) | Imported into Claude Code as we develop the orchestrator and frontend | Coverage: does it know about Prediction × Lend composition? Where does it default to outdated v1 endpoints? |
-| Docs MCP | Connected to editor; used for endpoint lookups in real time | Search ranking, doc freshness, schema completeness in MCP responses |
-| `llms.txt` / `llms-full.txt` | Loaded into Claude Code at session start | Whether structure helps the agent stay on-track for cross-API tasks |
+| `llms.txt` / `llms-full.txt` | 4.5 / 5 | Surprise winner. Loaded once at session start, served as the spine of context throughout. |
+| Jupiter CLI | 4 / 5 | Best-shaped surface. The CLI is doing normalization the API doesn't. Promote those normalizers as `@jup-ag/api-client` (DX-GAP-#11). |
+| Skill: `jupiter-lend` | 4 / 5 | Glossary saved a half-day. Surfaced DX-GAP-#15, #16, #17 — Jupiter has already merged the `client.lending` fix. |
+| Skill: `integrating-jupiter` | 3.5 / 5 | Clean intent-router. We hit DX-GAP-#13 (auth overstatement) and #10 (install command not headless-safe). **Auth fix upstreamed as [jup-ag/agent-skills#20](https://github.com/jup-ag/agent-skills/pull/20).** |
+| Documentation MCP | 2.5 / 5 | Configured but never exercised — honest signal on when MCP shines (early-lifecycle in-editor scaffolding, not post-bootstrap debugging). |
 
-We will keep a **DX log** during development — every friction point with timestamp and link — and roll it into the final report.
+We kept a **DX log** during development at [`docs/dx-log/`](./docs/dx-log/) — every friction point with timestamp — that crystallized into the 31 numbered findings in [`DX-REPORT.md`](./DX-REPORT.md).
 
 ---
 
@@ -250,12 +262,16 @@ We will keep a **DX log** during development — every friction point with times
 
 ---
 
-## Definition of "done" for v1 demo
+## Definition of "done" for v1 — as shipped
 
-- [ ] User can deposit USDC via connected wallet
-- [ ] Vault deposits to Jupiter Lend Earn (jlUSDC) automatically
-- [ ] Daily rebalance loop runs end-to-end on real mainnet (or one rebalance manually triggered)
-- [ ] At least 5 hedges currently open across diverse tail-risk markets
-- [ ] Depositor can see their share, projected P&L scenarios, and claim status
-- [ ] DX log is publicly readable and rolled into DX-REPORT.md
-- [ ] Submission includes: link to repo, deployed app, demo video, DX-REPORT.md
+The original DoD was written 2026-04-30. Below is the honest report card on what shipped vs what was planned, with deviations explained.
+
+- [x] **User can deposit USDC via connected wallet** — `apps/web/src/app/deposit/page.tsx` + `DepositForm.tsx` with sign-message proof. Live-tested 4 times.
+- [x] **Vault deposits to Jupiter Lend Earn (jlUSDC) automatically** — via the rebalance loop (`rebalance.ts`); fresh wallet USDC is split per `HEDGE_BUDGET_FRACTION` between hedge bucket and Lend compound on every tick. Currently $19.75 in jlUSDC at ~4.24% APY.
+- [x] **Rebalance loop runs end-to-end on real mainnet** — both via the daily cron (`REBALANCE_CRON=0 0 * * *`) and via admin trigger (`POST /admin/rebalance/trigger`). Cooldown is now persisted to SQLite (`vault_state` table) so it survives orchestrator restart.
+- [ ] **At least 5 hedges currently open across diverse tail-risk markets** — **deviation: 1 hedge currently open** (16 NO contracts on POLY-1345531). The original 5-market basket was compressed to a single market because Jupiter Prediction's $5-per-order minimum × the small live TVL meant no per-market allocation cleared the threshold (DX-GAP-#24 documented this in production). A diversified 5-market basket needs ~$100 vault TVL with the original weights; the v1 demo runs at ~$26 TVL. The full basket is preserved in `basket.config.json` for v1.5 once TVL allows.
+- [x] **Depositor can see their share, projected position value, and balance** — `/me` page shows position value, contributed amount, payouts accrued, and **withdrawable now** (the DX-GAP-#28 fix that clamps notional to redeemable).
+- [x] **DX log is publicly readable and rolled into DX-REPORT.md** — `docs/dx-log/` has the chronological friction log; `DX-REPORT.md` has 31 numbered findings; `/dx` page (when running locally) renders every Jupiter API call live.
+- [ ] **Submission includes link to repo, deployed app, demo video, DX-REPORT.md** — repo ✓, DX-REPORT ✓, **deployed app and demo video pending** (post-/clear, before final submission).
+
+Two unmet items: 5-hedge basket (deferred to v1.5 by capital constraint, documented as DX-GAP-#24) and the deploy + video deliverables (queued for the final submission pass). Everything else shipped as planned.

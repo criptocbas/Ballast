@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { getJupiterClients } from './jupiter.js';
@@ -13,15 +14,18 @@ import {
   getDepositorClaimTotal,
   getDepositorNetBalance,
   getDepositorTotal,
+  getDepositorWithdrawable,
   getTotalContributed,
   listDepositors,
   recordDeposit,
 } from './accountant.js';
+import { fetchVaultRedeemableUsdc } from './balances.js';
 import { getDb } from './db/index.js';
 import {
   listPersistedHedges,
   runRebalanceTick,
   scheduleRebalanceCron,
+  scheduleWithdrawalCron,
 } from './rebalance.js';
 import { claimPosition, runClaimSweep } from './claimer.js';
 import { requireAdmin } from './auth.js';
@@ -82,6 +86,14 @@ server.get('/health', async () => ({ status: 'ok', cluster: cfg.SOLANA_CLUSTER }
 let vaultInfoCache: { value: unknown; at: number } | null = null;
 let vaultInfoInFlight: Promise<unknown> | null = null;
 const VAULT_INFO_TTL_MS = 15_000;
+
+/**
+ * Invalidate the /vault/info snapshot — call after any admin mutation so the
+ * next public read reflects the new state instead of serving 15s-stale data.
+ */
+function bustVaultInfoCache(): void {
+  vaultInfoCache = null;
+}
 
 server.get('/vault/info', async () => {
   const now = Date.now();
@@ -381,20 +393,56 @@ server.post<{ Body: WithdrawalRequestBody | undefined }>(
 /**
  * Public per-depositor view: only meaningful if the caller knows the wallet
  * pubkey already. Aggregate amounts only — no PII beyond what's already on chain.
+ *
+ * Rate-limited per IP — this endpoint hits SQLite + (transitively) the Solana
+ * RPC, so leaving it open at full throughput is a trivial DoS surface. The
+ * route is wrapped in an encapsulated sub-plugin because @fastify/rate-limit's
+ * onRoute hook needs to be attached before the route is declared, which means
+ * the plugin must be registered in the same scope as the route, before it.
  */
-server.get<{ Params: { wallet: string } }>('/api/me/:wallet', async (req) => {
-  const wallet = req.params.wallet;
-  const totalContributed = getDepositorTotal(wallet);
-  const totalContributedAll = getTotalContributed();
-  const balance = getDepositorNetBalance(wallet);
-  const claimTotal = getDepositorClaimTotal(wallet);
-  return {
-    wallet,
-    contributedUsdc: totalContributed,
-    sharePct: totalContributedAll > 0 ? (totalContributed / totalContributedAll) * 100 : 0,
-    payoutsAccruedUsdc: claimTotal,
-    balance,
-  };
+void server.register(async (instance) => {
+  await instance.register(rateLimit, {
+    global: false,
+    max: 120,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => req.ip,
+  });
+
+  instance.get<{ Params: { wallet: string } }>(
+    '/api/me/:wallet',
+    {
+      config: {
+        rateLimit: { max: 60, timeWindow: '1 minute' },
+      },
+    },
+    async (req) => {
+      const wallet = req.params.wallet;
+      const totalContributed = getDepositorTotal(wallet);
+      const totalContributedAll = getTotalContributed();
+      const balance = getDepositorNetBalance(wallet);
+      const claimTotal = getDepositorClaimTotal(wallet);
+      const redeemable = await fetchVaultRedeemableUsdc().catch(() => 0);
+      const withdrawable = getDepositorWithdrawable({
+        wallet,
+        redeemableVaultUsdc: redeemable,
+      });
+      return {
+        wallet,
+        contributedUsdc: totalContributed,
+        sharePct: totalContributedAll > 0 ? (totalContributed / totalContributedAll) * 100 : 0,
+        payoutsAccruedUsdc: claimTotal,
+        balance,
+        // Honest withdrawable view — see DX-GAP-#28 for the rationale.
+        withdrawable: {
+          notionalNet: withdrawable.notionalNet,
+          withdrawableNow: withdrawable.withdrawableNow,
+          hedgeLockedUsdc: withdrawable.hedgeLockedUsdc,
+          shareFraction: withdrawable.shareFraction,
+          redeemableVaultUsdc: withdrawable.redeemableVaultUsdc,
+        },
+      };
+    },
+  );
 });
 
 // ─── Admin endpoints ──────────────────────────────────────────────────────────
@@ -408,11 +456,17 @@ server.post<{ Body: { dryRun?: boolean; skipCompound?: boolean } | undefined }>(
     if (typeof body.dryRun === 'boolean') opts.dryRun = body.dryRun;
     if (typeof body.skipCompound === 'boolean') opts.skipCompound = body.skipCompound;
     // NOTE: minIntervalMs intentionally NOT exposed — admins still respect the cooldown gate.
-    return runRebalanceTick(opts);
+    const result = await runRebalanceTick(opts);
+    bustVaultInfoCache();
+    return result;
   },
 );
 
-server.post('/admin/claim/sweep', { preHandler: requireAdmin }, async () => runClaimSweep());
+server.post('/admin/claim/sweep', { preHandler: requireAdmin }, async () => {
+  const result = await runClaimSweep();
+  bustVaultInfoCache();
+  return result;
+});
 
 server.post<{ Body: { limit?: number; dryRun?: boolean } | undefined }>(
   '/admin/deposits/watcher',
@@ -422,7 +476,9 @@ server.post<{ Body: { limit?: number; dryRun?: boolean } | undefined }>(
     const opts: Parameters<typeof runDepositWatcher>[0] = {};
     if (typeof body.limit === 'number') opts.limit = body.limit;
     if (typeof body.dryRun === 'boolean') opts.dryRun = body.dryRun;
-    return runDepositWatcher(opts);
+    const result = await runDepositWatcher(opts);
+    bustVaultInfoCache();
+    return result;
   },
 );
 
@@ -431,7 +487,9 @@ server.post<{ Params: { positionPubkey: string } }>(
   { preHandler: requireAdmin },
   async (req, reply) => {
     try {
-      return await claimPosition(req.params.positionPubkey);
+      const result = await claimPosition(req.params.positionPubkey);
+      bustVaultInfoCache();
+      return result;
     } catch (err) {
       return reply.code(400).send({
         error: 'claim_failed',
@@ -442,7 +500,9 @@ server.post<{ Params: { positionPubkey: string } }>(
 );
 
 server.post('/admin/withdrawals/process', { preHandler: requireAdmin }, async () => {
-  return processPendingWithdrawals();
+  const result = await processPendingWithdrawals();
+  bustVaultInfoCache();
+  return result;
 });
 
 server.get('/admin/depositors', { preHandler: requireAdmin }, async () => {
@@ -466,7 +526,20 @@ server.setNotFoundHandler((_req, reply) => {
 });
 
 server.setErrorHandler((err, _req, reply) => {
-  // Don't echo internal details to clients — log server-side only.
+  // 4xx errors (rate limit 429, validation 400, etc.) carry a structured
+  // statusCode and should pass through to the client with their natural code.
+  // 5xx and unstructured errors are server faults — log and return a generic
+  // 'internal_error' to avoid leaking internals.
+  const errObj = err as { statusCode?: number; code?: string; message?: string };
+  const statusCode = errObj.statusCode;
+  if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+    void reply.code(statusCode).send({
+      error: errObj.code ?? 'request_error',
+      statusCode,
+      message: errObj.message ?? 'request failed',
+    });
+    return;
+  }
   log.error({ err }, 'Unhandled request error');
   void reply.code(500).send({ error: 'internal_error' });
 });
@@ -486,9 +559,14 @@ async function main(): Promise<void> {
     maxAge: 86_400,
   });
 
+  // Note: @fastify/rate-limit is registered inside an encapsulated sub-plugin
+  // alongside the routes it protects (see /api/me/:wallet) — its onRoute hook
+  // requires the plugin to be set up before the routes it decorates are added.
+
   // Open the database eagerly so migrations apply before the first request.
   getDb();
   scheduleRebalanceCron();
+  scheduleWithdrawalCron();
   await server.listen({ port: cfg.ORCHESTRATOR_PORT, host: '0.0.0.0' });
   log.info({ port: cfg.ORCHESTRATOR_PORT }, 'Ballast orchestrator listening');
 

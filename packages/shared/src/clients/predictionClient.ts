@@ -27,7 +27,7 @@ export interface ListEventsOptions {
 }
 
 /**
- * Wraps Jupiter Prediction Market read endpoints used by Reflux's basket selector.
+ * Wraps Jupiter Prediction Market read endpoints used by Ballast's basket selector.
  * Order placement (POST /orders) is in a separate client because it needs auth.
  */
 export class PredictionClient {

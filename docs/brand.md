@@ -16,7 +16,7 @@ The name was chosen over "Reflux" after a brief audit found:
 - The first Google result for "Reflux" is a medical condition
 - "Ballast" has no DeFi taker, a clean Solana-DeFi search result, and a metaphor that explains the product in one word
 
-The `criptocbas/Reflux` GitHub repo URL is kept as a small origin-story Easter egg; everything else — workspace name, packages (`@ballast/*`), database file, branding — is Ballast.
+Everything ships as Ballast — workspace name, packages (`@ballast/*`), database file, GitHub repo, branding. The only surviving "Reflux" references are inside `docs/dx-log/*` and `docs/api-research/*`, which are frozen historical snapshots from before the rename.
 
 ## One-line description
 

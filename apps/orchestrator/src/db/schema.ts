@@ -143,6 +143,19 @@ export const yieldWithdrawals = sqliteTable('yield_withdrawals', {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * Restart-safe key/value store for orchestrator-level state that has to survive
+ * process death — the rebalance cooldown timestamp is the canonical use case.
+ * Keep the schema minimal; if a value needs structure, JSON-encode it into `value`.
+ */
+export const vaultState = sqliteTable('vault_state', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: integer('updated_at')
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export type Depositor = typeof depositors.$inferSelect;
 export type Deposit = typeof deposits.$inferSelect;
 export type Withdrawal = typeof withdrawals.$inferSelect;
@@ -151,3 +164,4 @@ export type Observation = typeof observations.$inferSelect;
 export type ClaimDistribution = typeof claimDistributions.$inferSelect;
 export type Nonce = typeof nonces.$inferSelect;
 export type YieldWithdrawal = typeof yieldWithdrawals.$inferSelect;
+export type VaultState = typeof vaultState.$inferSelect;

@@ -8,7 +8,12 @@ import { buildCanonicalMessage, requestNonce, type NoncePurpose } from '@/lib/au
 
 interface WithdrawFormProps {
   orchestratorUrl: string;
-  /** Maximum withdrawable in USDC — depositor's net balance. */
+  /**
+   * Honest cap on this withdrawal — `withdrawableNow` from the depositor view.
+   * This is `min(notionalNet, shareOfRedeemable)`, NOT raw notional, so the
+   * UI never offers a withdrawal the vault would reject at simulation. The
+   * gap between this and notional is hedge-locked capital — see DX-GAP-#28.
+   */
   maxUsdc: number;
   onSettled?: () => void;
 }
@@ -122,7 +127,7 @@ export function WithdrawForm({ orchestratorUrl, maxUsdc, onSettled }: WithdrawFo
         </div>
       </label>
       <div className="flex items-center justify-between text-xs text-[var(--fg-muted)]">
-        <span>You can withdraw up to your net balance.</span>
+        <span>Capped at the vault&apos;s redeemable share for your wallet.</span>
         <button
           type="button"
           onClick={() => setAmount(String(Math.max(0, maxUsdc)))}

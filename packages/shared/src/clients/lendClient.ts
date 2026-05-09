@@ -2,7 +2,7 @@ import type { LendEarnToken } from '../types/lend.js';
 import type { JupiterHttpClient } from './http.js';
 
 /**
- * Wraps the subset of Jupiter Lend Earn endpoints Reflux uses.
+ * Wraps the subset of Jupiter Lend Earn endpoints Ballast uses.
  * Read-only operations work with keyless access; transaction crafting needs an API key.
  */
 export class LendEarnClient {

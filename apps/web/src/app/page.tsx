@@ -95,7 +95,7 @@ export default function HomePage() {
           <Step
             num="01"
             title="Deposit USDC"
-            body="You connect your Solana wallet and deposit USDC into the vault. Funds go directly into Jupiter Lend Earn (jlUSDC, currently earning 4.36% APY)."
+            body="You connect your Solana wallet and deposit USDC into the vault. Funds go directly into Jupiter Lend Earn (jlUSDC, currently earning ~4.24% APY)."
           />
           <Step
             num="02"

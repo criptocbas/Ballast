@@ -29,7 +29,7 @@ The dev orchestrator uses `tsx watch` and auto-restarts on file changes. The web
 
 The product is **Ballast** — workspace name, all packages (`@ballast/web`, `@ballast/orchestrator`, `@ballast/shared`), DB filename (`ballast.sqlite`), GitHub URL (`https://github.com/criptocbas/Ballast`), branding, CSS classes. See `docs/brand.md` for the naming decision.
 
-The only legitimate "Reflux" references are inside `docs/dx-log/*` and `docs/api-research/*` — frozen historical snapshots that document what the project was called when each entry was written. **Do not update them retrospectively.** The git remote URL still points at `Reflux.git` but GitHub redirects the rename — the user will eventually run `git remote set-url origin https://github.com/criptocbas/Ballast.git`; until then both URLs resolve.
+The only legitimate "Reflux" references are inside `docs/dx-log/*` and `docs/api-research/*` — frozen historical snapshots that document what the project was called when each entry was written. **Do not update them retrospectively.** The git remote was renamed: `origin` now points at `https://github.com/criptocbas/Ballast.git` (GitHub still redirects the old `Reflux.git` URL).
 
 If you find a `@reflux/*` or `Reflux` reference outside those two directories, it's stale — fix it.
 
@@ -90,7 +90,7 @@ The orchestrator gained a coordinated robustness pass before the demo. Six concr
 
 ## Demo basket override (temporary, revert after submission)
 
-`apps/orchestrator/basket.config.json` is **temporarily compressed to a single-market basket** (POLY-1345530, weight 1.0) for the live demo. Reason: the original 5-market basket × Jupiter Prediction's $5 minimum × small TVL means no market clears the per-weight order minimum (DX-GAP-#24 in production). The full diversified basket is preserved in the JSON file under the `_inactive_diversified_basket` key; restore by moving that array back into `markets`.
+`apps/orchestrator/basket.config.json` is **temporarily compressed to a single-market basket** (POLY-1345531, weight 1.0 — BTC > $90k EOY 2026, NO ask ~$0.32) for the live demo. Reason: the original 5-market basket × Jupiter Prediction's $5 minimum × small TVL means no market clears the per-weight order minimum (DX-GAP-#24 in production). The original 5-market basket is preserved in the JSON under the `_inactive_diversified_basket_NEEDS_RECURATION` key, but **do not restore as-is** — when re-probed on 2026-05-07 against `/prediction/v1/markets/{id}`, 3 of the 5 markets had resolved/closed (including the previous demo target POLY-1345530, which closed when BTC crossed $80k mid-build). Re-curate first via `pnpm --filter @ballast/orchestrator exec tsx src/scripts/findMarket.ts <keyword>`.
 
 This decision should itself become a small finding ("we shipped a 5-market basket but had to ship a 1-market basket for live demos because of the $5 minimum × small TVL economics") — file it under DX-GAP-#24 amplification when adding to DX-REPORT.
 
